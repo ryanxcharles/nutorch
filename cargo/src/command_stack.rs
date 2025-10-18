@@ -27,7 +27,7 @@ impl PluginCommand for CommandStack {
     }
 
     fn description(&self) -> &str {
-        "Concatenate a sequence of tensors along a new axis (torch.stack)."
+        "Stack a sequence of tensors along a new dimension. All tensors must have identical shapes. (similar to torch.stack in PyTorch)"
     }
 
     fn signature(&self) -> Signature {
@@ -82,9 +82,8 @@ torch stack [$x $y] --dim 1 | torch shape    # -> [2, 2, 3]
         call: &nu_plugin::EvaluatedCall,
         input: PipelineData,
     ) -> Result<PipelineData, LabeledError> {
-        //------------------------------------------------------------------
-        // 1. Collect list of IDs (pipeline xor argument)
-        //------------------------------------------------------------------
+        // ── dual input: pipeline OR argument (not both) ───────────────
+        // Supports: [$t1 $t2] | torch stack   OR   torch stack [$t1 $t2]
         let piped = match input {
             PipelineData::Value(v, _) => Some(v),
             PipelineData::Empty => None,
@@ -95,6 +94,7 @@ torch stack [$x $y] --dim 1 | torch shape    # -> [2, 2, 3]
         };
         let arg0 = call.nth(0);
 
+        // ── validate exactly one input source ─────────────────────────
         match (&piped, &arg0) {
             (None, None) => {
                 return Err(LabeledError::new("Missing input")
@@ -109,9 +109,9 @@ torch stack [$x $y] --dim 1 | torch shape    # -> [2, 2, 3]
             _ => {}
         }
 
+        // ── extract tensor IDs from list ──────────────────────────────
         let list_val = piped.or(arg0).unwrap();
 
-        // accept single-level list of strings
         let ids: Vec<String> = list_val
             .as_list()
             .map_err(|_| {
@@ -128,14 +128,10 @@ torch stack [$x $y] --dim 1 | torch shape    # -> [2, 2, 3]
             );
         }
 
-        //------------------------------------------------------------------
-        // 2. Parse dim flag (default 0)
-        //------------------------------------------------------------------
+        // ── get stack dimension (default: 0) ──────────────────────────
         let mut dim: i64 = call.get_flag("dim")?.unwrap_or(0);
 
-        //------------------------------------------------------------------
-        // 3. Fetch tensors & validate shape equality
-        //------------------------------------------------------------------
+        // ── fetch all tensors from registry ───────────────────────────
         let mut reg = TENSOR_REGISTRY.lock().unwrap();
         let tensors: Vec<Tensor> = ids
             .iter()
@@ -149,7 +145,8 @@ torch stack [$x $y] --dim 1 | torch shape    # -> [2, 2, 3]
             })
             .collect::<Result<_, _>>()?;
 
-        // ensure identical shapes
+        // ── validate all tensors have identical shapes ────────────────
+        // Unlike cat, stack requires exact shape match (no variation allowed)
         let first_shape = tensors[0].size();
         for (i, t) in tensors.iter().enumerate().skip(1) {
             if t.size() != first_shape {
@@ -164,9 +161,9 @@ torch stack [$x $y] --dim 1 | torch shape    # -> [2, 2, 3]
             }
         }
 
-        //------------------------------------------------------------------
-        // 4. Adjust dim (negative allowed) and stack
-        //------------------------------------------------------------------
+        // ── adjust dimension for negative indexing ────────────────────
+        // Supports negative dims: -1 means last position, etc.
+        // Valid range: [-rank-1, rank] which maps to [0, rank]
         let rank = first_shape.len() as i64;
         if dim < 0 {
             dim += rank + 1;
@@ -178,11 +175,10 @@ torch stack [$x $y] --dim 1 | torch shape    # -> [2, 2, 3]
             ));
         }
 
+        // ── perform stack operation ───────────────────────────────────
         let result = Tensor::stack(&tensors, dim);
 
-        //------------------------------------------------------------------
-        // 5. Store result & return new ID
-        //------------------------------------------------------------------
+        // ── store & return ────────────────────────────────────────────
         let new_id = Uuid::new_v4().to_string();
         reg.insert(new_id.clone(), result);
 
