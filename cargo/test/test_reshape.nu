@@ -31,3 +31,12 @@ def "Test reshape 2D to 2D" [] {
   # [2, 3] reshaped to [3, 2]
   assert ($result == [3 2])
 }
+
+@test
+def "Test reshape to 3D" [] {
+  let input_data = $in
+  let v = ([1 2 3 4 5 6 7 8] | torch tensor)
+  let result = ($v | torch reshape [2 2 2] | torch shape)
+  # [8] reshaped to [2, 2, 2]
+  assert ($result == [2 2 2])
+}
