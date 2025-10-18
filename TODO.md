@@ -72,8 +72,8 @@ For each method, we track:
 ## Status Summary
 
 - **Total Methods Implemented**: 39
-- **Methods with Tests**: 32 (82%)
-- **Methods Meeting All Quality Criteria**: 15 (38%)
+- **Methods with Tests**: 33 (85%)
+- **Methods Meeting All Quality Criteria**: 16 (41%)
 
 ---
 
@@ -275,13 +275,13 @@ For each method, we track:
 
 **Command**: `torch max`
 
-- [ ] Test Coverage
-- [ ] Error Tests
-- [ ] Helper Usage
-- [ ] Dual Input
+- [x] Test Coverage
+- [x] Error Tests
+- [x] Helper Usage (N/A - reduction ops don't need creation helpers)
+- [x] Dual Input
 - [x] Examples
-- [ ] Validation
-- [ ] Documentation
+- [x] Validation
+- [x] Documentation
 
 ### `tensor.argmax(dim=None, keepdim=False)`
 
