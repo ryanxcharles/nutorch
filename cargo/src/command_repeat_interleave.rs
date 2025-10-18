@@ -29,8 +29,7 @@ impl PluginCommand for CommandRepeatInterleave {
     }
 
     fn description(&self) -> &str {
-        "Repeat elements of a tensor either a fixed number of times or 
-        according to another tensor of repeat counts."
+        "Repeat elements of a tensor. Supports scalar repeat count or per-element counts via tensor. (similar to tensor.repeat_interleave() in PyTorch)"
     }
 
     fn signature(&self) -> Signature {
@@ -88,18 +87,16 @@ $x | torch repeat_interleave $rep | torch value
         call: &nu_plugin::EvaluatedCall,
         input: PipelineData,
     ) -> Result<PipelineData, LabeledError> {
-        //------------------------------------------------------------------
-        // 1. source tensor must come via pipeline
-        //------------------------------------------------------------------
+        // ── source tensor must come through pipeline ───────────────────
+        // Pipeline-only design matches other shape ops
         let PipelineData::Value(src_val, _) = input else {
             return Err(LabeledError::new("Missing input")
                 .with_label("Source tensor ID must be piped in", call.head));
         };
         let src_id = src_val.as_str()?.to_string();
 
-        //------------------------------------------------------------------
-        // 2. 'repeats' positional argument
-        //------------------------------------------------------------------
+        // ── required 'repeats' argument (int or tensor ID) ────────────
+        // Supports two modes: scalar repeat or per-element repeat counts
         let repeats_val = call
             .nth(0)
             .ok_or_else(|| {
@@ -108,15 +105,11 @@ $x | torch repeat_interleave $rep | torch value
             })?
             .clone();
 
-        //------------------------------------------------------------------
-        // 3. optional named flags
-        //------------------------------------------------------------------
+        // ── optional named flags ───────────────────────────────────────
         let dim_opt: Option<i64> = call.get_flag("dim")?;
         let osize_opt: Option<i64> = call.get_flag("output_size")?;
 
-        //------------------------------------------------------------------
-        // 4. fetch source tensor, registry lock
-        //------------------------------------------------------------------
+        // ── fetch source tensor ────────────────────────────────────────
         let mut reg = TENSOR_REGISTRY.lock().unwrap();
         let src = reg
             .get(&src_id)
@@ -126,16 +119,17 @@ $x | torch repeat_interleave $rep | torch value
             })?
             .shallow_clone();
 
-        //------------------------------------------------------------------
-        // 5. branch: repeats is int OR tensor-id
-        //------------------------------------------------------------------
+        // ── branch: int repeat vs tensor repeat ───────────────────────
+        // Two modes: scalar repeat (int) or per-element repeat (tensor)
         let result = if let Ok(rep_int) = repeats_val.as_int() {
+            // Scalar repeat mode: repeat each element rep_int times
             if rep_int <= 0 {
                 return Err(LabeledError::new("Invalid repeats")
                     .with_label("Repeat count must be > 0", call.head));
             }
             src.repeat_interleave_self_int(rep_int, dim_opt, osize_opt)
         } else {
+            // Tensor repeat mode: per-element repeat counts
             let rep_id = repeats_val.as_str()?.to_string();
             let rep_t = reg
                 .get(&rep_id)
@@ -145,6 +139,7 @@ $x | torch repeat_interleave $rep | torch value
                 })?
                 .shallow_clone();
 
+            // Ensure repeat tensor is Int64 (tch-rs requirement)
             let rep_t = if rep_t.kind() == Kind::Int64 {
                 rep_t
             } else {
@@ -154,9 +149,7 @@ $x | torch repeat_interleave $rep | torch value
             src.repeat_interleave_self_tensor(&rep_t, dim_opt, osize_opt)
         };
 
-        //------------------------------------------------------------------
-        // 6. store result & return ID
-        //------------------------------------------------------------------
+        // ── store & return ─────────────────────────────────────────────
         let new_id = Uuid::new_v4().to_string();
         reg.insert(new_id.clone(), result);
         Ok(PipelineData::Value(Value::string(new_id, call.head), None))
