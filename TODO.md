@@ -73,7 +73,7 @@ For each method, we track:
 
 - **Total Methods Implemented**: 39
 - **Methods with Tests**: 34 (87%)
-- **Methods Meeting All Quality Criteria**: 29 (74%)
+- **Methods Meeting All Quality Criteria**: 31 (79%)
 
 ---
 
@@ -459,13 +459,13 @@ For each method, we track:
 
 **Command**: `torch log_softmax`
 
-- [x] Test Coverage
-- [ ] Error Tests
+- [x] Test Coverage (13 tests: 10 functionality + 3 error)
+- [x] Error Tests
 - [x] Helper Usage (dtype)
-- [x] Dual Input
+- [x] Dual Input (supports both pipeline and argument forms)
 - [x] Examples
-- [x] Validation (dimension)
-- [ ] Documentation
+- [x] Validation (dimension bounds)
+- [x] Documentation
 
 ---
 

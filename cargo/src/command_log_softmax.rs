@@ -18,7 +18,7 @@ impl PluginCommand for CommandLogSoftmax {
     }
 
     fn description(&self) -> &str {
-        "Compute the log-softmax of a tensor along a specified dimension (similar to torch.log_softmax)"
+        "Compute the log-softmax of a tensor along a specified dimension. (similar to tensor.log_softmax() in PyTorch)"
     }
 
     fn signature(&self) -> Signature {
@@ -70,9 +70,8 @@ impl PluginCommand for CommandLogSoftmax {
         call: &nu_plugin::EvaluatedCall,
         input: PipelineData,
     ) -> Result<PipelineData, LabeledError> {
-        // -------------------------------------------------------------
-        // Fetch tensor id: either from pipeline or from first argument
-        // -------------------------------------------------------------
+        // ── dual input: pipeline OR argument (not both) ───────────────
+        // Supports: $t | torch log_softmax   OR   torch log_softmax $t
         let piped = match input {
             PipelineData::Empty => None,
             PipelineData::Value(v, _) => Some(v),
@@ -83,6 +82,7 @@ impl PluginCommand for CommandLogSoftmax {
         };
         let arg0 = call.nth(0);
 
+        // ── extract tensor ID from exactly one source ─────────────────
         let tensor_id = match (piped, arg0) {
             (Some(_), Some(_)) => {
                 return Err(LabeledError::new("Conflicting input").with_label(
@@ -106,7 +106,7 @@ impl PluginCommand for CommandLogSoftmax {
             })?,
         };
 
-        // -------------------- fetch tensor ---------------------------
+        // ── fetch tensor from registry ────────────────────────────────
         let mut registry = TENSOR_REGISTRY.lock().unwrap();
         let tensor = registry
             .get(&tensor_id)
@@ -115,10 +115,10 @@ impl PluginCommand for CommandLogSoftmax {
             })?
             .shallow_clone();
 
-        // -------------------- dtype flag -----------------------------
+        // ── optional dtype flag ───────────────────────────────────────
         let kind = get_kind_from_call(call)?;
 
-        // -------------------- dim flag -------------------------------
+        // ── optional dim flag (default: last dimension) ───────────────
         let dim = match call.get_flag::<i64>("dim")? {
             Some(d) => {
                 let n = tensor.size().len() as i64;
@@ -133,10 +133,10 @@ impl PluginCommand for CommandLogSoftmax {
             None => (tensor.size().len() as i64) - 1,
         };
 
-        // ------------------- compute --------------------------------
+        // ── compute log-softmax ───────────────────────────────────────
         let result_tensor = tensor.log_softmax(dim, kind);
 
-        // ------------------- store & return --------------------------
+        // ── store & return ────────────────────────────────────────────
         let new_id = Uuid::new_v4().to_string();
         registry.insert(new_id.clone(), result_tensor);
         Ok(PipelineData::Value(Value::string(new_id, call.head), None))
