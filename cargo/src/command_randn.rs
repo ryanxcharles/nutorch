@@ -21,7 +21,7 @@ impl PluginCommand for CommandRandn {
     }
 
     fn description(&self) -> &str {
-        "Generate a tensor filled with random numbers from a normal distribution (mean 0, std 1)"
+        "Generate a tensor filled with random numbers from a normal distribution (mean 0, std 1) (similar to torch.randn)"
     }
 
     fn signature(&self) -> Signature {
@@ -57,13 +57,23 @@ impl PluginCommand for CommandRandn {
         vec![
             Example {
                 description: "Generate a 2x3 tensor with random values from a normal distribution",
-                example: "torch randn 2 3 | torch tovalue",
+                example: "torch randn 2 3 | torch value",
                 result: None,
             },
             Example {
                 description:
                     "Generate a 1D tensor of size 5 with a specific seed for reproducibility",
-                example: "torch manual_seed 42; torch randn 5 | torch tovalue",
+                example: "torch manual_seed 42; torch randn 5 | torch value",
+                result: None,
+            },
+            Example {
+                description: "Generate a tensor with gradient tracking enabled",
+                example: "torch randn 2 2 --requires_grad true",
+                result: None,
+            },
+            Example {
+                description: "Generate a tensor with specific dtype",
+                example: "torch randn 3 3 --dtype float64 | torch value",
                 result: None,
             },
         ]
