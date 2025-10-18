@@ -72,8 +72,8 @@ For each method, we track:
 ## Status Summary
 
 - **Total Methods Implemented**: 39
-- **Methods with Tests**: 30 (77%)
-- **Methods Meeting All Quality Criteria**: 12 (31%)
+- **Methods with Tests**: 31 (79%)
+- **Methods Meeting All Quality Criteria**: 13 (33%)
 
 ---
 
@@ -235,13 +235,13 @@ For each method, we track:
 
 **Command**: `torch exp`
 
-- [ ] Test Coverage
-- [ ] Error Tests
-- [ ] Helper Usage
-- [ ] Dual Input
+- [x] Test Coverage
+- [x] Error Tests
+- [x] Helper Usage (N/A - unary ops don't need creation helpers)
+- [x] Dual Input
 - [x] Examples
-- [ ] Validation
-- [ ] Documentation
+- [x] Validation
+- [x] Documentation
 
 ### `tensor.detach()`
 
