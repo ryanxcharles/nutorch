@@ -22,7 +22,7 @@ impl PluginCommand for CommandLinspace {
     }
 
     fn description(&self) -> &str {
-        "Create a 1D tensor with linearly spaced values"
+        "Create a 1D tensor with linearly spaced values (similar to torch.linspace)"
     }
 
     fn signature(&self) -> Signature {
@@ -52,11 +52,28 @@ impl PluginCommand for CommandLinspace {
     }
 
     fn examples(&self) -> Vec<Example> {
-        vec![Example {
-            description: "Create a tensor from 0.0 to 1.0 with 4 steps",
-            example: "torch linspace 0.0 1.0 4",
-            result: None,
-        }]
+        vec![
+            Example {
+                description: "Create a tensor from 0.0 to 1.0 with 5 steps",
+                example: "torch linspace 0.0 1.0 5 | torch value",
+                result: None,
+            },
+            Example {
+                description: "Create a tensor from -1.0 to 1.0 with 3 steps",
+                example: "torch linspace -1.0 1.0 3 | torch value",
+                result: None,
+            },
+            Example {
+                description: "Create a tensor with gradient tracking enabled",
+                example: "torch linspace 0.0 10.0 11 --requires_grad true",
+                result: None,
+            },
+            Example {
+                description: "Create a tensor with specific dtype",
+                example: "torch linspace 0.0 5.0 6 --dtype float64 | torch value",
+                result: None,
+            },
+        ]
     }
 
     fn run(
@@ -69,6 +86,12 @@ impl PluginCommand for CommandLinspace {
         let start: f64 = call.nth(0).unwrap().as_float()?;
         let end: f64 = call.nth(1).unwrap().as_float()?;
         let steps: i64 = call.nth(2).unwrap().as_int()?;
+
+        // Validate steps parameter
+        if steps < 1 {
+            return Err(LabeledError::new("Invalid input")
+                .with_label("Steps must be at least 1", call.head));
+        }
 
         // Handle optional device argument
         let device = get_device_from_call(call)?;
