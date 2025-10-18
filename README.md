@@ -12,6 +12,7 @@ libtorch, the C++ backend of [PyTorch](https://pytorch.org/).
 ---
 
 **Current Status:** 40 PyTorch methods implemented with 100% quality coverage
+
 **Project Stage:** Alpha - Proof of concept, functional for neural network
 training
 
@@ -23,7 +24,6 @@ training
 - **[CLAUDE.md](CLAUDE.md)** - Architecture, development guide,
   counter-intuitive facts
 - **[TODO.md](TODO.md)** - Implementation status, quality tracking, roadmap
-- **[cargo/README.md](cargo/README.md)** - Additional build notes
 
 ## Demo
 

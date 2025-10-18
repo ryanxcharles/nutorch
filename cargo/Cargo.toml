@@ -8,6 +8,7 @@ license = "MIT"
 documentation = "https://github.com/nutorch/nutorch"
 repository = "https://github.com/nutorch/nutorch"
 homepage = "https://nutorch.com"
+readme = "../README.md"
 
 [[bin]]
 name = "nu_plugin_torch"
