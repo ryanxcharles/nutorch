@@ -114,6 +114,33 @@ def "Test reshape from scalar" [] {
 }
 
 @test
+def "Test reshape 3D to 1D" [] {
+  let input_data = $in
+  let t = torch full [2 3 4] 1
+  let result = ($t | torch reshape [24] | torch shape)
+  # [2, 3, 4] = 24 elements reshaped to [24]
+  assert ($result == [24])
+}
+
+@test
+def "Test reshape with -1 in middle" [] {
+  let input_data = $in
+  let v = ([1 2 3 4 5 6 7 8 9 10 11 12] | torch tensor)
+  let result = ($v | torch reshape [2 -1 3] | torch shape)
+  # [12] reshaped to [2, -1, 3] becomes [2, 2, 3]
+  assert ($result == [2 2 3])
+}
+
+@test
+def "Test reshape identity" [] {
+  let input_data = $in
+  let t = ([[1 2] [3 4]] | torch tensor)
+  let result = ($t | torch reshape [2 2] | torch value)
+  # Reshaping to same shape preserves structure
+  assert ($result == [[1 2] [3 4]])
+}
+
+@test
 def "Error case with invalid tensor ID" [] {
   let input_data = $in
   try {
