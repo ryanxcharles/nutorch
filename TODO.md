@@ -73,7 +73,7 @@ For each method, we track:
 
 - **Total Methods Implemented**: 39
 - **Methods with Tests**: 31 (79%)
-- **Methods Meeting All Quality Criteria**: 13 (33%)
+- **Methods Meeting All Quality Criteria**: 14 (36%)
 
 ---
 
@@ -248,12 +248,12 @@ For each method, we track:
 **Command**: `torch detach`
 
 - [x] Test Coverage
-- [ ] Error Tests
-- [ ] Helper Usage
+- [x] Error Tests
+- [x] Helper Usage (N/A - unary ops don't need creation helpers)
 - [x] Dual Input
 - [x] Examples
-- [ ] Validation
-- [ ] Documentation
+- [x] Validation
+- [x] Documentation
 
 ---
 
