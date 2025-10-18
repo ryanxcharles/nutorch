@@ -23,7 +23,7 @@ impl PluginCommand for CommandReshape {
     fn name(&self) -> &str { "torch reshape" }
 
     fn description(&self) -> &str {
-        "Return a tensor with the same data but a new shape (wraps Tensor::reshape)."
+        "Return a tensor with the same data but a new shape. Supports -1 for dimension inference. (similar to tensor.reshape() in PyTorch)"
     }
 
     fn signature(&self) -> Signature {
@@ -67,6 +67,7 @@ $v | torch reshape [3 -1] | torch shape        # → [3, 2]
     ) -> Result<PipelineData, LabeledError>
     {
         // ── source tensor must come through pipeline ───────────────────
+        // Pipeline-only design matches other shape ops (squeeze, unsqueeze)
         let PipelineData::Value(tid_val, _) = input else {
             return Err(LabeledError::new("Missing input")
                 .with_label("Tensor ID must be piped into torch reshape", call.head));
@@ -74,6 +75,8 @@ $v | torch reshape [3 -1] | torch shape        # → [3, 2]
         let src_id = tid_val.as_str()?.to_string();
 
         // ── required shape list argument ───────────────────────────────
+        // Shape is a list of integers: [2, 3, 4] or [2, -1] for inference
+        // Empty list [] is valid for reshaping to scalar
         let shape_val = call.nth(0).ok_or_else(|| {
             LabeledError::new("Missing shape")
                 .with_label("First argument must be the target shape list", call.head)
@@ -101,6 +104,10 @@ $v | torch reshape [3 -1] | torch shape        # → [3, 2]
         })?.shallow_clone();
 
         // ── reshape (tch will error if incompatible) ───────────────────
+        // Validation is delegated to PyTorch's C++ backend via tch-rs:
+        //   - Checks element count compatibility
+        //   - Handles -1 inference (at most one -1 allowed)
+        //   - Provides clear error messages for invalid reshapes
         let result = src.reshape(&shape);
 
         // ── store & return ─────────────────────────────────────────────
