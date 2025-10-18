@@ -38,6 +38,7 @@ mod command_softmax;
 mod command_squeeze;
 mod command_stack;
 mod command_sub;
+mod command_sum;
 mod command_t;
 mod command_tensor;
 mod command_torch;
@@ -78,6 +79,7 @@ pub use command_softmax::CommandSoftmax;
 pub use command_squeeze::CommandSqueeze;
 pub use command_stack::CommandStack;
 pub use command_sub::CommandSub;
+pub use command_sum::CommandSum;
 pub use command_t::CommandT;
 pub use command_tensor::CommandTensor;
 pub use command_torch::CommandTorch;
@@ -128,6 +130,7 @@ impl Plugin for NutorchPlugin {
             Box::new(CommandSqueeze),
             Box::new(CommandStack),
             Box::new(CommandSub),
+            Box::new(CommandSum),
             Box::new(CommandT),
             Box::new(CommandTensor),
             Box::new(CommandTorch),
