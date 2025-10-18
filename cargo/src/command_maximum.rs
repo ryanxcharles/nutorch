@@ -132,6 +132,20 @@ $a | torch maximum $b | torch value
             .shallow_clone();
 
         //------------------------------------------------------------------
+        // device compatibility check
+        //------------------------------------------------------------------
+        if t1.device() != t2.device() {
+            return Err(LabeledError::new("Device mismatch").with_label(
+                format!(
+                    "Tensors must be on the same device. tensor1: {:?}, tensor2: {:?}",
+                    t1.device(),
+                    t2.device()
+                ),
+                call.head,
+            ));
+        }
+
+        //------------------------------------------------------------------
         // broadcast-compatibility check
         //------------------------------------------------------------------
         #[allow(clippy::items_after_statements)]
