@@ -73,7 +73,7 @@ For each method, we track:
 
 - **Total Methods Implemented**: 39
 - **Methods with Tests**: 34 (87%)
-- **Methods Meeting All Quality Criteria**: 21 (54%)
+- **Methods Meeting All Quality Criteria**: 22 (56%)
 
 ---
 
@@ -346,7 +346,7 @@ For each method, we track:
 - [x] Test Coverage
 - [x] Error Tests
 - [x] Helper Usage (N/A - shape ops don't need creation helpers)
-- [x] Dual Input
+- [x] Dual Input (Pipeline-only by design, matches unsqueeze)
 - [x] Examples
 - [x] Validation
 - [x] Documentation
@@ -356,12 +356,12 @@ For each method, we track:
 **Command**: `torch unsqueeze`
 
 - [x] Test Coverage
-- [ ] Error Tests
-- [ ] Helper Usage
-- [x] Dual Input
+- [x] Error Tests
+- [x] Helper Usage (N/A - shape ops don't need creation helpers)
+- [x] Dual Input (Pipeline-only by design)
 - [x] Examples
 - [x] Validation (dimension)
-- [ ] Documentation
+- [x] Documentation
 
 ### `tensor.reshape(*shape)`
 
