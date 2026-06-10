@@ -1,4 +1,10 @@
-# Nutorch
+# Nutorch v1 (archived)
+
+> **This is the archived v1 proof of concept** — a working Nushell plugin,
+> frozen as the reference implementation for v2. Active development (nutorchd, a
+> shell-agnostic tensor daemon) happens at the [repository root](../README.md);
+> the v1 architecture record is in [AGENTS.md](AGENTS.md). Paths in this
+> document are relative to `v1/`.
 
 **PyTorch tensor operations for Nushell** - GPU-accelerated machine learning
 from the command line.
