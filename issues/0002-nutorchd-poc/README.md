@@ -120,3 +120,8 @@ random seeds.
 - Protocol design quality, auth, multi-daemon, Nushell premium client — each
   deferred to later issues
 - Fixing the v1 build (explicitly not a goal)
+
+## Experiments
+
+- [Experiment 1: Toolchain proof — tch 0.24.0 + libtorch 2.11.0 builds and sees MPS](01-toolchain-proof.md)
+  — **Designed**
