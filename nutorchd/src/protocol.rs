@@ -11,6 +11,23 @@ pub enum Request {
         device: Option<String>,
         dtype: Option<String>,
     },
+    Full {
+        shape: Vec<i64>,
+        value: serde_json::Value,
+        device: Option<String>,
+        dtype: Option<String>,
+    },
+    Add {
+        a: String,
+        b: String,
+    },
+    Mm {
+        a: String,
+        b: String,
+    },
+    Mean {
+        handle: String,
+    },
     Value {
         handle: String,
     },

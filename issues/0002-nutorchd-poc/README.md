@@ -131,4 +131,5 @@ random seeds.
   — **Pass** (cross-process handle persistence proven on CPU and MPS; found and
   fixed the no-rpath-from-torch-sys gap that broke direct shell execution)
 - [Experiment 3: The compute ops — `full`, `add`, `mm`, `mean`, and the two PoC pipelines](03-compute-ops.md)
-  — **Designed**
+  — **Pass** (both PoC pipelines exact on MPS: `[5.0,7.0,9.0]` and `1000.0`;
+  v1's device/shape validation ported; 19 tests green)

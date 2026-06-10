@@ -2,6 +2,16 @@
 [implementer]
 agent = "claude-code"
 model = "claude-fable-5"
+
+[review.design]
+agent = "claude-code"
+subagent = "adversarial-reviewer"
+model = "claude-opus"
+
+[review.result]
+agent = "claude-code"
+subagent = "adversarial-reviewer"
+model = "claude-opus"
 +++
 
 # Experiment 3: The compute ops — `full`, `add`, `mm`, `mean`, and the two PoC pipelines
@@ -135,3 +145,77 @@ against the v1 source (citations verified exact); the reviewer also confirmed
 the added mm device check is honestly attributed (v1's mm has no device check;
 the design credits it to `add`'s) and in-scope per Experiment 2's conclusion. No
 new findings.
+
+## Result
+
+**Result:** Pass
+
+All six checks pass; the issue's two PoC pipelines produce their exact expected
+values on MPS, from a plain shell, against a directly-executed daemon:
+
+```
+=== PIPELINE 1: the issue's round trip (MPS) ===
+[5.0,7.0,9.0]
+=== PIPELINE 2: the GPU showcase (MPS, exact) ===
+1000.0
+=== check 4: cross-device mismatch ===
+torch: device mismatch: tensors must be on the same device, got Cpu and Mps
+exit: 1   → liveness probe: [9.0]
+=== check 5: mm shape validation ===
+torch: mm shape mismatch: inner dimensions must match, got [2, 3] and [2, 3]
+exit: 1   → liveness probe: [9.0]
+=== check 6: CPU equivalence ===
+[5.0,7.0,9.0]
+```
+
+The MPS mean over 10^6 identical f32 values came back **exactly** `1000.0` — the
+design's exactness rationale held; no Partial carve-out needed.
+
+**Hygiene:** `cargo build` 0 warnings; `cargo test` green — 19 tests (16 unit: 8
+conversion + 1 registry + 7 new dispatch tests, plus the 3 Experiment-1 MPS
+smoke tests); `cargo fmt --all -- --check` clean; `dprint check` clean;
+`git status --porcelain v1/` empty.
+
+**Informal timing** (check 7, not a pass criterion): `mm` of `[4000,4000]` ones,
+measured at the client (includes socket round trip): cpu 0.088s, mps 0.035s
+(~2.5×). Both are dominated by op dispatch at this size; tensors already
+resident daemon-side is the structural win — no per-invocation data transfer.
+
+**Verification-run note (recorded for honesty):** the first behavioral run
+failed entirely on a test-script bug, not a product bug — zsh does not
+word-split `$S`, so a `--socket <path>` packed into one variable reached the
+client as a single argument and every client targeted the default socket. Re-run
+with explicit `--socket $SOCK` arguments throughout. No code change resulted.
+
+## Conclusion
+
+**The issue's goal is met.** From any shell: create tensors (`tensor`, `full`),
+compute on the GPU (`add`, `mm`, `mean` on MPS), and read results back (`value`)
+— with tensor memory owned by nutorchd, surviving across client processes,
+behind string handles that compose in POSIX pipelines. All six ops honor the
+carried-forward principles: Rust-side validation (shapes, ranks, devices — the
+ported v1 checks fire before any tch call), v1's float32-default fidelity,
+fallible tch calls so the daemon never dies on bad input.
+
+What this PoC leaves deliberately on the table (the next issues): the throwaway
+NDJSON protocol, daemon lifecycle (no socket cleanup on signal, unconditional
+stale-socket steal, one-connection-at-a-time), tensor lifecycle
+(`free`/TTL/named handles — the registry only grows), autograd, the full
+dual-input surface, and the Nushell premium client. The PoC's structural lesson
+worth carrying into the protocol issue: handles-on-stdout composes so well in
+plain bash that the bar for the premium client is higher than expected.
+
+## Result Review
+
+**Reviewer:** `adversarial-reviewer` subagent (fresh context, read-only),
+reviewing the pre-commit working tree. **Verdict: APPROVED — no Required,
+Optional, or Nit findings.** The reviewer independently reran every gate and
+behavioral check against its own daemon instance: both PoC pipelines exact
+(`[5.0,7.0,9.0]`, `1000.0` on MPS), the device-mismatch and shape errors with
+liveness probes, CPU equivalence, and all 19 tests / fmt / dprint / v1-frozen
+gates. It verified the implementation line-by-line against the v1 reference
+citations (device check, mm validation, full validation, mean float32 default),
+confirmed the stdin handle is genuinely the left operand using a non-commutative
+product, traced the zsh word-splitting account through the client arg parser and
+confirmed it hides no product issue, and judged the issue-goal claim correct:
+"What the PoC proves" items 1-4 are satisfied by experiments 1-3 collectively.

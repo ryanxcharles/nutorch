@@ -69,6 +69,23 @@ fn positional_or_stdin(args: &Args, index: usize, what: &str) -> Result<String, 
     Ok(line.to_string())
 }
 
+/// Two handles for a binary op. Two positionals → (a, b). One positional →
+/// a comes from stdin and the positional is b (pipeline form, matching v1's
+/// pipeline-is-first-operand convention). Zero positionals → error.
+fn binary_handles(args: &Args, op: &str) -> Result<(String, String), String> {
+    match args.positional.len() {
+        2 => Ok((args.positional[0].clone(), args.positional[1].clone())),
+        1 => {
+            let a = positional_or_stdin(args, 1, "left-hand tensor handle")?;
+            Ok((a, args.positional[0].clone()))
+        }
+        0 => Err(format!(
+            "{op} needs two tensor handles (two arguments, or pipe one in and pass one)"
+        )),
+        n => Err(format!("{op} takes two tensor handles, got {n} arguments")),
+    }
+}
+
 fn build_request(args: &Args) -> Result<serde_json::Value, String> {
     match args.op.as_str() {
         "tensor" => {
@@ -81,6 +98,39 @@ fn build_request(args: &Args) -> Result<serde_json::Value, String> {
                 "device": args.device,
                 "dtype": args.dtype,
             }))
+        }
+        "full" => {
+            let shape_text = args
+                .positional
+                .first()
+                .ok_or("full needs a shape, e.g. torch full '[2,2]' 1")?;
+            let shape: serde_json::Value = serde_json::from_str(shape_text)
+                .map_err(|e| format!("shape is not valid JSON: {e}"))?;
+            let value_text = args
+                .positional
+                .get(1)
+                .ok_or("full needs a fill value, e.g. torch full '[2,2]' 1")?;
+            let value: serde_json::Value = serde_json::from_str(value_text)
+                .map_err(|e| format!("fill value is not a number: {e}"))?;
+            Ok(serde_json::json!({
+                "op": "full",
+                "shape": shape,
+                "value": value,
+                "device": args.device,
+                "dtype": args.dtype,
+            }))
+        }
+        "add" => {
+            let (a, b) = binary_handles(args, "add")?;
+            Ok(serde_json::json!({ "op": "add", "a": a, "b": b }))
+        }
+        "mm" => {
+            let (a, b) = binary_handles(args, "mm")?;
+            Ok(serde_json::json!({ "op": "mm", "a": a, "b": b }))
+        }
+        "mean" => {
+            let handle = positional_or_stdin(args, 0, "tensor handle")?;
+            Ok(serde_json::json!({ "op": "mean", "handle": handle }))
         }
         "value" => {
             let handle = positional_or_stdin(args, 0, "tensor handle")?;
