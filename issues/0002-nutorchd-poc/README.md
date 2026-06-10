@@ -1,6 +1,7 @@
 +++
-status = "open"
+status = "closed"
 opened = "2026-06-10"
+closed = "2026-06-10"
 +++
 
 # Issue 2: nutorchd proof of concept — tensors in a daemon, used from any shell
@@ -133,3 +134,44 @@ random seeds.
 - [Experiment 3: The compute ops — `full`, `add`, `mm`, `mean`, and the two PoC pipelines](03-compute-ops.md)
   — **Pass** (both PoC pipelines exact on MPS: `[5.0,7.0,9.0]` and `1000.0`;
   v1's device/shape validation ported; 19 tests green)
+
+## Conclusion
+
+The proof of concept works, in three experiments. From a plain shell:
+
+```bash
+a=$(torch tensor '[1,2,3]' --device mps)
+b=$(torch tensor '[4,5,6]' --device mps)
+torch add $a $b | torch value                          # [5.0,7.0,9.0]
+
+torch full '[1000,1000]' 1 --device mps \
+  | torch mm "$(torch full '[1000,1000]' 1 --device mps)" \
+  | torch mean | torch value                           # 1000.0, exactly
+```
+
+`nutorchd` owns the tensors (registry, LibTorch context, GPU memory); the thin
+`torch` client passes string handles over an NDJSON Unix socket; handles created
+by one process are used by another; all six ops run with v1's validation ported
+into a never-dies daemon (fallible `f_*` calls, one-line errors). Everything the
+issue's "What the PoC proves" section demanded is proven: the toolchain builds
+(exp 1), tensor memory outlives clients (exp 2), GPU compute works end-to-end
+from bash with exact results, and the v1 command logic ported cleanly (exp 3).
+
+Hard-won facts for the next issues:
+
+1. **Toolchain**: tch 0.24.0 ↔ libtorch v2.11.0 via the PyPI wheel in a
+   repo-local venv (`.venv-torch` + `.libtorch` symlink), force-pinned in
+   `.cargo/config.toml`. No arm64 libtorch zip exists; `download-libtorch` does
+   not work on this platform; libtorch 2.11 fixed the clang header error that
+   killed v1.
+2. **rpath**: torch-sys bakes no rpath when `LIBTORCH` is set — repo-relative
+   rpaths are baked via rustflags. Binaries only run in-repo; the install story
+   is open.
+3. **Deliberate PoC debts** (each needs an issue): throwaway NDJSON protocol;
+   daemon lifecycle (no signal cleanup, unconditional stale-socket steal, serial
+   connections); tensor lifecycle (registry only grows — no `free`, TTLs, or
+   named handles); autograd; the full dual-input surface; the Nushell premium
+   client; install/distribution.
+
+The structural bet paid off: handles-on-stdout makes plain bash feel almost
+native, which raises the bar for what the Nushell client must add.
