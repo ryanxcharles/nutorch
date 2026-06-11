@@ -79,3 +79,8 @@ In: the five verbs/flags above, golden-verified gradients for a representative
 op set, docs (README + the op-table summaries where relevant). Out (recorded):
 optimizers and nn modules (the follow-up issue), `--retain-graph`/higher-order
 gradients unless trivially cheap, per-op `grad_fn` introspection.
+
+## Experiments
+
+- [Experiment 1: The autograd surface — five verbs and a flag](01-autograd-surface.md)
+  — **Designed**
