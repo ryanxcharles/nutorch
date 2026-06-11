@@ -481,7 +481,49 @@ ok("cr_unique", "unique", [t([3.0, 1.0, 2.0, 1.0, 3.0])], {},
 ok("cr_unique_rank2", "unique", [t([[3.0, 1.0], [2.0, 1.0]])], {},
    lambda ts: [torch.unique(ts[0])])
 
+# --- gradient goldens (issue 0008): per-op backward verification ---
+# Each case: x (requires_grad, post-transfer leaf on MPS) -> op -> sum ->
+# backward -> x.grad. The op list is the MPS-backward oracle. Inputs are
+# chosen in-domain and chains avoid degenerate losses (softmax.sum() == 1
+# would have an identically-zero gradient — a broken backward passes
+# vacuously; it goes through softmax*softmax instead).
+def grad_case(name, op, data, params=None, with_self=False, square_loss=False):
+    x = torch.tensor(data, dtype=torch.float32, device=DEV).requires_grad_(True)
+    if with_self:
+        y = getattr(torch, op)(x, x)
+    elif params:
+        y = getattr(torch, op)(x, **params)
+    else:
+        y = getattr(torch, op)(x)
+    loss = (y * y).sum() if square_loss else y.sum()
+    loss.backward()
+    cases.append({
+        "name": name,
+        "grad_op": op,
+        "input": {"data": data, "dtype": "float32"},
+        "params": params or {},
+        "with_self": with_self,
+        "square_loss": square_loss,
+        "expect_grad": x.grad.cpu().tolist(),
+    })
+
+grad_case("ag_sin", "sin", [0.3, 1.0, 2.0])
+grad_case("ag_exp", "exp", [-1.0, 0.0, 1.0])
+grad_case("ag_sigmoid", "sigmoid", [-2.0, 0.0, 2.0])
+grad_case("ag_tanh", "tanh", [-1.0, 0.0, 1.0])
+grad_case("ag_sqrt", "sqrt", [1.0, 4.0, 9.0])
+grad_case("ag_relu", "relu", [-2.0, 0.5, 3.0])
+grad_case("ag_log", "log", [0.5, 1.0, 4.0])
+grad_case("ag_mul_self", "mul", [1.0, 2.0, 3.0], with_self=True)
+grad_case("ag_mm_self", "mm", [[1.0, 2.0], [3.0, 4.0]], with_self=True)
+grad_case("ag_pow2", "pow", [1.0, 2.0, 3.0], params={"exponent": 2})
+grad_case("ag_mean", "mean", [1.0, 2.0, 3.0, 4.0])
+grad_case("ag_sum_dim", "sum", [[1.0, 2.0], [3.0, 4.0]], params={"dim": 1})
+grad_case("ag_softmax_sq", "softmax", [1.0, 2.0, 3.0], params={"dim": 0},
+          square_loss=True)
+
 out = pathlib.Path(__file__).resolve().parent.parent / "nutorchd" / "tests" / "golden.json"
+
 
 
 

@@ -97,9 +97,13 @@ pub fn handle_request(
             (execute_table(registry, spec, &tensors, &params), false)
         }
         Request::Bespoke(bespoke) => match bespoke {
-            Bespoke::Tensor { data, dtype } => {
+            Bespoke::Tensor {
+                data,
+                dtype,
+                requires_grad,
+            } => {
                 lifecycle.lock().unwrap().touch();
-                match build_input_tensor(&data, dtype.as_deref()) {
+                match build_input_tensor(&data, dtype.as_deref(), requires_grad.unwrap_or(false)) {
                     Ok(tensor) => (Response::handle(registry.insert(tensor)), false),
                     Err((code, message)) => (Response::error(code, message), false),
                 }
@@ -250,6 +254,7 @@ pub fn log_path_for(socket: &Path) -> PathBuf {
 fn build_input_tensor(
     data: &serde_json::Value,
     dtype_flag: Option<&str>,
+    requires_grad: bool,
 ) -> Result<Tensor, (&'static str, String)> {
     let (payload, envelope_dtype, envelope_shape) = match data.as_object() {
         Some(object) if object.contains_key("data") => {
@@ -324,7 +329,28 @@ fn build_input_tensor(
             ));
         }
     }
+    if requires_grad {
+        return mark_requires_grad(tensor);
+    }
     Ok(tensor)
+}
+
+/// Make a tensor a tracked autograd leaf. MUST be the last construction
+/// step, applied to the post-transfer MPS tensor: set before a device
+/// move, the moved tensor is a NON-leaf whose .grad stays None forever
+/// while gradients land on a hidden pre-transfer leaf (the .to() trap,
+/// issue 0008). Float dtypes only — PyTorch's own rule.
+fn mark_requires_grad(tensor: Tensor) -> Result<Tensor, (&'static str, String)> {
+    if !matches!(tensor.kind(), Kind::Float | Kind::Double | Kind::Half) {
+        return Err((
+            "bad_dtype",
+            format!(
+                "only floating point tensors can require gradients, got {}",
+                convert::kind_name(tensor.kind())
+            ),
+        ));
+    }
+    Ok(tensor.set_requires_grad(true))
 }
 
 /// nutorchd is GPU-only (issue 0003): Mac-only for now, so the GPU is MPS.
@@ -762,10 +788,17 @@ fn apply(
             let shape = p.int_list("shape").expect("required");
             validate_shape(op, &shape)?;
             let kind = parse_table_kind(op, p.str("dtype"))?;
-            match p.scalar("value").expect("required") {
-                Scalar::Int(i) => one(op, Tensor::f_full(&shape, i, (kind, Device::Mps))),
-                Scalar::Float(f) => one(op, Tensor::f_full(&shape, f, (kind, Device::Mps))),
-            }
+            let result = match p.scalar("value").expect("required") {
+                Scalar::Int(i) => Tensor::f_full(&shape, i, (kind, Device::Mps)),
+                Scalar::Float(f) => Tensor::f_full(&shape, f, (kind, Device::Mps)),
+            };
+            let tensor = result.map_err(|e| tch(op, e))?;
+            let tensor = if p.bool("requires_grad") {
+                mark_requires_grad(tensor)?
+            } else {
+                tensor
+            };
+            Ok(Applied::Tensors(vec![tensor]))
         }
         "randn" => {
             let shape = p.int_list("shape").expect("required");
@@ -784,11 +817,18 @@ fn apply(
             // issue 0005 exp 1), and the CPU generator is the one Python's
             // torch.manual_seed drives too — so this is what makes randn
             // both deterministic and golden-comparable.
-            one(
-                op,
-                Tensor::f_randn(&shape, (kind, Device::Cpu))
-                    .and_then(|t| t.f_to_device(Device::Mps)),
-            )
+            let tensor = Tensor::f_randn(&shape, (kind, Device::Cpu))
+                .and_then(|t| t.f_to_device(Device::Mps))
+                .map_err(|e| tch(op, e))?;
+            // requires_grad LAST, on the post-transfer tensor (the .to()
+            // non-leaf trap, issue 0008): set before the move, the MPS
+            // tensor is a non-leaf whose grad stays None forever.
+            let tensor = if p.bool("requires_grad") {
+                mark_requires_grad(tensor)?
+            } else {
+                tensor
+            };
+            Ok(Applied::Tensors(vec![tensor]))
         }
         // --- reductions sweep (issue 0005 exp 3) ---
         "prod" => match p.int("dim") {
@@ -1049,7 +1089,13 @@ fn apply(
             } else {
                 Tensor::f_ones(&shape, (kind, Device::Mps))
             };
-            one(op, result)
+            let tensor = result.map_err(|e| tch(op, e))?;
+            let tensor = if p.bool("requires_grad") {
+                mark_requires_grad(tensor)?
+            } else {
+                tensor
+            };
+            Ok(Applied::Tensors(vec![tensor]))
         }
         "eye" => {
             let n = p.int("n").expect("required");
@@ -1093,12 +1139,17 @@ fn apply(
         "rand" => {
             let shape = p.int_list("shape").expect("required");
             validate_shape(op, &shape)?;
-            // Seeded CPU generator -> MPS (the randn convention).
-            one(
-                op,
-                Tensor::f_rand(&shape, (Kind::Float, Device::Cpu))
-                    .and_then(|t| t.f_to_device(Device::Mps)),
-            )
+            // Seeded CPU generator -> MPS (the randn convention);
+            // requires_grad LAST, post-transfer (the .to() non-leaf trap).
+            let tensor = Tensor::f_rand(&shape, (Kind::Float, Device::Cpu))
+                .and_then(|t| t.f_to_device(Device::Mps))
+                .map_err(|e| tch(op, e))?;
+            let tensor = if p.bool("requires_grad") {
+                mark_requires_grad(tensor)?
+            } else {
+                tensor
+            };
+            Ok(Applied::Tensors(vec![tensor]))
         }
         "randint" => {
             let shape = p.int_list("shape").expect("required");
@@ -1204,6 +1255,58 @@ fn apply(
             .and_then(|flat| flat.f_unique_dim(0, true, false, false))
             .map(|(values, _, _)| Applied::Tensors(vec![values]))
             .map_err(|e| tch(op, e)),
+        // --- autograd surface (issue 0008) ---
+        "backward" => {
+            if !t[0].requires_grad() {
+                return Err((
+                    "bad_argument",
+                    "backward: tensor does not require gradients (create with --requires_grad)"
+                        .to_string(),
+                ));
+            }
+            let numel = t[0].numel();
+            if numel != 1 {
+                return Err((
+                    "bad_argument",
+                    format!(
+                        "backward: needs a scalar loss, got shape {:?} ({numel} elements) — reduce first (e.g. sum or mean)",
+                        t[0].size()
+                    ),
+                ));
+            }
+            t[0].f_backward().map_err(|e| tch(op, e))?;
+            Ok(Applied::Nothing)
+        }
+        "grad" => {
+            let grad = t[0].f_grad().map_err(|e| tch(op, e))?;
+            if !grad.defined() {
+                return Err((
+                    "bad_argument",
+                    "no gradient: run backward first".to_string(),
+                ));
+            }
+            // Snapshot, not a live view: .grad accumulates in place under
+            // later backward calls, and a handle that silently changes is
+            // action at a distance the shell cannot see. NOTE: tch's
+            // f_clone is the clone-INTO-out variant (an aliasing trap the
+            // unit test caught) — deep-copy explicitly instead.
+            let detached = grad.f_detach().map_err(|e| tch(op, e))?;
+            let mut snapshot = detached.f_zeros_like().map_err(|e| tch(op, e))?;
+            snapshot.f_copy_(&detached).map_err(|e| tch(op, e))?;
+            Ok(Applied::Tensors(vec![snapshot]))
+        }
+        "detach" => one(op, t[0].f_detach()),
+        "zero_grad" => {
+            // tch's own recipe (Tensor::zero_grad): detach_ then zero_ on
+            // the grad alias, so the in-place zero is not tracked. The
+            // grad stays DEFINED (zeros) — a later `grad` returns zeros.
+            let mut grad = t[0].f_grad().map_err(|e| tch(op, e))?;
+            if grad.defined() {
+                let _ = grad.f_detach_().map_err(|e| tch(op, e))?;
+                let _ = grad.f_zero_().map_err(|e| tch(op, e))?;
+            }
+            Ok(Applied::Nothing)
+        }
         "manual_seed" => {
             tch::manual_seed(p.int("seed").expect("required"));
             Ok(Applied::Nothing)
@@ -1792,7 +1895,7 @@ mod roundtrip_semantics {
 
     #[test]
     fn bool_data_infers_bool_and_round_trips() {
-        let tensor = build_input_tensor(&json!([true, false, true]), None).unwrap();
+        let tensor = build_input_tensor(&json!([true, false, true]), None, false).unwrap();
         assert_eq!(tensor.kind(), Kind::Bool);
         let mut registry = Registry::new();
         let h = registry.insert(tensor);
@@ -1801,7 +1904,7 @@ mod roundtrip_semantics {
 
     #[test]
     fn mixed_bool_and_number_without_dtype_errors() {
-        let err = build_input_tensor(&json!([true, 1]), None).unwrap_err();
+        let err = build_input_tensor(&json!([true, 1]), None, false).unwrap_err();
         assert_eq!(err.0, "bad_argument");
         assert!(err.1.contains("mixed booleans and numbers"));
     }
@@ -1809,15 +1912,15 @@ mod roundtrip_semantics {
     #[test]
     fn explicit_dtype_casts_both_ways_like_pytorch() {
         // numbers -> bool via != 0 (the [2,0,-1] case proves != 0, not == 1)
-        let t = build_input_tensor(&json!([0, 1, 2]), Some("bool")).unwrap();
+        let t = build_input_tensor(&json!([0, 1, 2]), Some("bool"), false).unwrap();
         let mut registry = Registry::new();
         let h = registry.insert(t);
         assert_eq!(cpu_json(&registry, &h), json!([false, true, true]));
-        let t = build_input_tensor(&json!([2, 0, -1]), Some("bool")).unwrap();
+        let t = build_input_tensor(&json!([2, 0, -1]), Some("bool"), false).unwrap();
         let h = registry.insert(t);
         assert_eq!(cpu_json(&registry, &h), json!([true, false, true]));
         // bools -> float32
-        let t = build_input_tensor(&json!([true, false]), Some("float32")).unwrap();
+        let t = build_input_tensor(&json!([true, false]), Some("float32"), false).unwrap();
         assert_eq!(t.kind(), Kind::Float);
         let h = registry.insert(t);
         assert_eq!(cpu_json(&registry, &h), json!([1.0, 0.0]));
@@ -1825,7 +1928,8 @@ mod roundtrip_semantics {
 
     #[test]
     fn non_finite_tokens_round_trip_bit_exactly() {
-        let t = build_input_tensor(&json!(["NaN", "Infinity", "-Infinity", 1.5]), None).unwrap();
+        let t =
+            build_input_tensor(&json!(["NaN", "Infinity", "-Infinity", 1.5]), None, false).unwrap();
         assert_eq!(t.kind(), Kind::Float);
         let mut registry = Registry::new();
         let h = registry.insert(t);
@@ -1855,7 +1959,7 @@ mod roundtrip_semantics {
 
     #[test]
     fn non_finite_tokens_reject_integer_dtypes() {
-        let err = build_input_tensor(&json!(["NaN"]), Some("int64")).unwrap_err();
+        let err = build_input_tensor(&json!(["NaN"]), Some("int64"), false).unwrap_err();
         assert_eq!(err.0, "bad_argument");
     }
 
@@ -1863,7 +1967,7 @@ mod roundtrip_semantics {
     fn envelope_round_trip_preserves_dtype() {
         for (dtype, data) in [("int64", json!([1, 2, 3])), ("bool", json!([true, false]))] {
             let envelope = json!({"dtype": dtype, "data": data});
-            let tensor = build_input_tensor(&envelope, None).unwrap();
+            let tensor = build_input_tensor(&envelope, None, false).unwrap();
             assert_eq!(convert::kind_name(tensor.kind()), dtype);
         }
     }
@@ -1872,21 +1976,189 @@ mod roundtrip_semantics {
     fn envelope_conflicts_and_mismatches_error() {
         // Conflicting dtype flag.
         let envelope = json!({"dtype": "int64", "data": [1, 2]});
-        let err = build_input_tensor(&envelope, Some("float32")).unwrap_err();
+        let err = build_input_tensor(&envelope, Some("float32"), false).unwrap_err();
         assert_eq!(err.0, "bad_argument");
         assert!(err.1.contains("conflicts"));
         // Identical dtype flag is fine.
-        assert!(build_input_tensor(&envelope, Some("int64")).is_ok());
+        assert!(build_input_tensor(&envelope, Some("int64"), false).is_ok());
         // Wrong shape.
         let envelope = json!({"shape": [2, 3], "data": [1, 2, 3, 4, 5, 6]});
-        let err = build_input_tensor(&envelope, None).unwrap_err();
+        let err = build_input_tensor(&envelope, None, false).unwrap_err();
         assert_eq!(err.0, "bad_argument");
         assert!(err.1.contains("does not match"));
         // Matching shape is fine.
         let envelope = json!({"shape": [3], "data": [1, 2, 3]});
-        assert!(build_input_tensor(&envelope, None).is_ok());
+        assert!(build_input_tensor(&envelope, None, false).is_ok());
         // Object without "data" is rejected.
-        let err = build_input_tensor(&json!({"values": [1]}), None).unwrap_err();
+        let err = build_input_tensor(&json!({"values": [1]}), None, false).unwrap_err();
         assert_eq!(err.0, "bad_argument");
+    }
+}
+
+#[cfg(test)]
+mod autograd_semantics {
+    use super::*;
+    use serde_json::json;
+
+    fn run_op(registry: &mut Registry, name: &str, handles: &[String]) -> Response {
+        let spec = nutorch_ops::find(name).unwrap();
+        execute_table(registry, spec, handles, &serde_json::Map::new())
+    }
+
+    fn first_handle(response: Response) -> String {
+        match response {
+            Response::Handles { handles, .. } => handles[0].clone(),
+            other => panic!("expected handles, got {other:?}"),
+        }
+    }
+
+    fn value_of(registry: &Registry, handle: &str) -> serde_json::Value {
+        let cpu = registry
+            .get(handle)
+            .unwrap()
+            .f_to_device(Device::Cpu)
+            .unwrap();
+        convert::tensor_to_json(&cpu).unwrap()
+    }
+
+    fn tracked_leaf(registry: &mut Registry, data: serde_json::Value) -> String {
+        let tensor = build_input_tensor(&data, None, true).unwrap();
+        registry.insert(tensor)
+    }
+
+    /// x*x summed: grad = 2x. Builds the loss and runs backward.
+    fn square_loss_backward(registry: &mut Registry, x: &str) -> String {
+        let y = first_handle(run_op(registry, "mul", &[x.to_string(), x.to_string()]));
+        let loss = first_handle(run_op(registry, "sum", &[y]));
+        assert!(matches!(
+            run_op(registry, "backward", &[loss.clone()]),
+            Response::Value { .. } | Response::Handles { .. }
+        ));
+        loss
+    }
+
+    #[test]
+    fn gradients_accumulate_and_zero_grad_resets_to_zeros() {
+        let mut registry = Registry::new();
+        let x = tracked_leaf(&mut registry, json!([1.0, 2.0]));
+        square_loss_backward(&mut registry, &x);
+        let g1 = first_handle(run_op(&mut registry, "grad", &[x.clone()]));
+        assert_eq!(value_of(&registry, &g1), json!([2.0, 4.0]));
+        // Second backward on a FRESH graph accumulates: grad doubles.
+        square_loss_backward(&mut registry, &x);
+        let g2 = first_handle(run_op(&mut registry, "grad", &[x.clone()]));
+        assert_eq!(value_of(&registry, &g2), json!([4.0, 8.0]));
+        // The first snapshot is immutable — untouched by the second pass.
+        assert_eq!(value_of(&registry, &g1), json!([2.0, 4.0]));
+        // zero_grad leaves a DEFINED zeros grad (pinned semantics).
+        assert!(matches!(
+            run_op(&mut registry, "zero_grad", &[x.clone()]),
+            Response::Value { .. } | Response::Handles { .. }
+        ));
+        let g3 = first_handle(run_op(&mut registry, "grad", &[x]));
+        assert_eq!(value_of(&registry, &g3), json!([0.0, 0.0]));
+    }
+
+    #[test]
+    fn grad_before_backward_is_a_clean_error() {
+        let mut registry = Registry::new();
+        let x = tracked_leaf(&mut registry, json!([1.0]));
+        match run_op(&mut registry, "grad", &[x]) {
+            Response::Error { code, error, .. } => {
+                assert_eq!(code, "bad_argument");
+                assert!(error.contains("run backward first"));
+            }
+            other => panic!("expected error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn backward_on_non_scalar_names_the_shape() {
+        let mut registry = Registry::new();
+        let x = tracked_leaf(&mut registry, json!([1.0, 2.0, 3.0]));
+        match run_op(&mut registry, "backward", &[x]) {
+            Response::Error { code, error, .. } => {
+                assert_eq!(code, "bad_argument");
+                assert!(
+                    error.contains("[3]"),
+                    "error should name the shape: {error}"
+                );
+            }
+            other => panic!("expected error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn backward_on_untracked_tensor_errors() {
+        let mut registry = Registry::new();
+        let tensor = build_input_tensor(&json!(1.5), None, false).unwrap();
+        let x = registry.insert(tensor);
+        match run_op(&mut registry, "backward", &[x]) {
+            Response::Error { code, error, .. } => {
+                assert_eq!(code, "bad_argument");
+                assert!(error.contains("does not require gradients"));
+            }
+            other => panic!("expected error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn detach_produces_an_untracked_handle() {
+        let mut registry = Registry::new();
+        let x = tracked_leaf(&mut registry, json!([1.0, 2.0]));
+        let y = first_handle(run_op(&mut registry, "mul", &[x.clone(), x.clone()]));
+        assert!(registry.get(&y).unwrap().requires_grad()); // tracked result
+        let d = first_handle(run_op(&mut registry, "detach", &[y]));
+        assert!(!registry.get(&d).unwrap().requires_grad());
+    }
+
+    #[test]
+    fn freeing_an_intermediate_does_not_break_backward() {
+        let mut registry = Registry::new();
+        let x = tracked_leaf(&mut registry, json!([1.0, 3.0]));
+        let y = first_handle(run_op(&mut registry, "mul", &[x.clone(), x.clone()]));
+        let loss = first_handle(run_op(&mut registry, "sum", &[y.clone()]));
+        // Free the intermediate's HANDLE; the graph still holds the tensor.
+        registry.remove(&y);
+        assert!(matches!(
+            run_op(&mut registry, "backward", &[loss]),
+            Response::Value { .. } | Response::Handles { .. }
+        ));
+        let g = first_handle(run_op(&mut registry, "grad", &[x]));
+        assert_eq!(value_of(&registry, &g), json!([2.0, 6.0]));
+    }
+
+    #[test]
+    fn requires_grad_rejects_int_dtypes() {
+        let err = build_input_tensor(&json!([1, 2]), Some("int64"), true).unwrap_err();
+        assert_eq!(err.0, "bad_dtype");
+        assert!(err.1.contains("floating point"));
+    }
+
+    #[test]
+    fn creation_ops_yield_tracked_mps_leaves() {
+        // The .to() trap regression test: randn --requires_grad must be a
+        // LEAF on MPS whose grad populates after backward.
+        let mut registry = Registry::new();
+        let spec = nutorch_ops::find("randn").unwrap();
+        let mut params = serde_json::Map::new();
+        params.insert("shape".into(), json!([2]));
+        params.insert("requires_grad".into(), json!(true));
+        let x = match execute_table(&mut registry, spec, &[], &params) {
+            Response::Handles { handles, .. } => handles[0].clone(),
+            other => panic!("expected handles, got {other:?}"),
+        };
+        assert!(registry.get(&x).unwrap().requires_grad());
+        assert_eq!(registry.get(&x).unwrap().device(), Device::Mps);
+        square_loss_backward(&mut registry, &x);
+        let g = first_handle(run_op(&mut registry, "grad", &[x.clone()]));
+        // grad = 2x, elementwise — verify against the tensor's own value.
+        let x_cpu = registry.get(&x).unwrap().f_to_device(Device::Cpu).unwrap();
+        let doubled = x_cpu.f_mul_scalar(2).unwrap();
+        let g_cpu = registry.get(&g).unwrap().f_to_device(Device::Cpu).unwrap();
+        assert_eq!(
+            convert::tensor_to_json(&g_cpu).unwrap(),
+            convert::tensor_to_json(&doubled).unwrap()
+        );
     }
 }

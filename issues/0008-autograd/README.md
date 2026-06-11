@@ -83,4 +83,6 @@ gradients unless trivially cheap, per-op `grad_fn` introspection.
 ## Experiments
 
 - [Experiment 1: The autograd surface — five verbs and a flag](01-autograd-surface.md)
-  — **Designed**
+  — **Pass** (13/13 gradient goldens first run, zero MPS backward exclusions;
+  the non-leaf trap pinned by regression test; the f_clone aliasing trap caught
+  by the snapshot-immutability test)

@@ -43,6 +43,29 @@ The default TTL is configurable via `NUTORCHD_TTL` (e.g. `30m`, `2h`, `none`).
 Run `torch ops` to list every available operation, and `torch <op> --help` for
 any one of them.
 
+## Autograd
+
+Gradients flow through any pipeline — libtorch records the graph automatically
+once a tensor requires them:
+
+```bash
+w=$(torch randn '[3]' --requires_grad)
+loss=$(torch mul $w $w | torch sum)
+torch backward $loss            # gradients ACCUMULATE across calls
+torch grad $w | torch value     # a snapshot: later backwards won't change it
+torch zero_grad $w              # reset; grad now reads as zeros
+d=$(torch detach $w)            # graph-free reference (stops tracking)
+```
+
+Rules of the road: `backward` needs a scalar loss (reduce first) on a tensor
+that requires gradients; `grad` before any backward is an error; rebuilding the
+graph (re-running the pipeline) before each backward is required — a second
+backward through the SAME graph errors, as in PyTorch. Graph lifetime: freeing
+an intermediate's handle is safe (the graph holds the tensor internally until
+the graph itself dies), but keep your LEAF handles — they are the only key to
+their gradients. `torch tensors` counts only registry handles; graph-held
+storage is invisible to it.
+
 ## Saving tensors and reclaiming memory
 
 Tensors live exactly as long as the daemon (default idle TTL: 1 hour).

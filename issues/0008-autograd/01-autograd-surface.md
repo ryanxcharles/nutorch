@@ -183,3 +183,68 @@ run on MPS (zero expected exclusions); `f_grad` never errors (so `defined()` is
 the correct gate); `set_requires_grad` mutates in place; aliased-handle
 `mm(x,x)` is sound; and the table model fits all four verbs with no protocol
 surgery.
+
+## Result
+
+**Result:** Pass
+
+The whole surface landed: four table ops (`backward`, `grad`, `detach`,
+`zero_grad` — category `autograd`), `--requires_grad` on bespoke `tensor` plus
+the five weight-init creation rows, gradient goldens, and the README section.
+All five issue design questions are settled as designed.
+
+- **Gradient goldens: 13/13 first run** (220 total, floor 218; byte-stable
+  regeneration at sha256 `7c71ad50…`) — every representative op's backward
+  bitwise-matches Python on MPS, including the non-degenerate softmax·softmax
+  case. **MPS backward oracle exclusions: zero** (as the design reviewer
+  pre-verified).
+- **Unit tests** (57 daemon tests, up from 49): accumulation → zero_grad →
+  zeros; snapshot immutability; grad-before-backward; non-scalar backward naming
+  the shape; untracked backward; detach untracking; the free-intermediate
+  demonstration; int-dtype rejection; and the `.to()` non-leaf regression case
+  (`randn --requires_grad` is a tracked MPS LEAF whose grad populates — the
+  design review's trap, pinned).
+- **Live, the issue's goal verbatim**: seeded `randn --requires_grad` →
+  `mul|sum` → `backward` → `grad` reads exactly 2x the values; `zero_grad` →
+  grad reads zeros (pinned semantics); double backward through the same graph
+  errors with libtorch's own informative retain_graph message as a passthrough
+  `torch_error`; two fresh graphs accumulate 2.0→4.0 while the first snapshot
+  stays [2.0, 4.0]; freeing an intermediate handle then backward succeeds with
+  the right gradient; all three error paths exit 1 with named causes.
+- **Hygiene**: build 0 warnings; fmt/dprint clean; full suite green; `v1/`
+  untouched.
+- **One implementation find, caught by the unit test before review**: tch's
+  `f_clone(&self, out)` is the clone-INTO-out variant — the natural reading
+  (`g.f_clone(&g)`) silently aliases instead of copying, and the
+  snapshot-immutability test failed exactly as designed to. The snapshot now
+  allocates explicitly (`f_zeros_like` + `f_copy_`) with the trap documented at
+  the call site.
+
+## Conclusion
+
+Autograd is a workflow, not an engine — confirmed: the entire feature is four
+one-tensor table ops, one flag, and the ordering discipline the design review
+made load-bearing (requires_grad LAST, post-transfer). PyTorch fidelity held
+everywhere it was pledged: accumulation, scalar-only backward, float-only
+leaves, and libtorch's own retain_graph error passing through. The issue's five
+design questions all closed on first implementation. nn/optim now has its
+prerequisite. The issue can close.
+
+## Result Review
+
+**Reviewer:** `adversarial-reviewer` subagent (fresh context, read-only),
+reviewing the pre-commit working tree. **Verdict: APPROVED — no Required,
+Optional, or Nit findings.** The reviewer independently confirmed all four
+design-review mandates in code AND behavior (the post-transfer ordering at all
+three sites with the regression test that would panic on the undefined grad; the
+non-degenerate softmax golden; zero_grad→zeros pinned in test, README, and live;
+the >= 218 floor against 220 actual), verified the f_clone aliasing claim
+against the tch source (clone-INTO-out variant) and the explicit-copy fix with
+its immutability assertion, spot-checked two gradient goldens against fresh
+Python (exact), reproduced byte-stable regeneration at the recorded sha, ran the
+full live workflow verbatim including all error paths and the dual-input forms
+of all four verbs, judged the README's detach wording honest (shares data,
+untracked), and confirmed registry hygiene (no orphans; backward/zero_grad
+create nothing). **Close readiness: READY** — all five design questions settled
+and verified; the Scope's exclusions correctly absent; the flag-spelling
+deviation deliberately recorded.

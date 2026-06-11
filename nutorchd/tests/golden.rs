@@ -13,7 +13,7 @@ const GOLDEN: &str = include_str!("golden.json");
 #[test]
 fn golden_cases_agree_with_real_pytorch() {
     let cases: Vec<serde_json::Value> = serde_json::from_str(GOLDEN).expect("golden.json parses");
-    assert!(cases.len() >= 200, "suspiciously few golden cases");
+    assert!(cases.len() >= 218, "suspiciously few golden cases");
 
     let mut failures = Vec::new();
     for case in &cases {
@@ -30,6 +30,9 @@ fn golden_cases_agree_with_real_pytorch() {
 }
 
 fn run_case(case: &serde_json::Value) -> Result<(), String> {
+    if case.get("grad_op").is_some() {
+        return run_grad_case(case);
+    }
     let mut registry = Registry::new();
     let op = case["op"].as_str().expect("op");
     let spec = nutorch_ops::find(op).ok_or_else(|| format!("op {op} not in table"))?;
@@ -119,6 +122,80 @@ fn run_case(case: &serde_json::Value) -> Result<(), String> {
         if &actual != expected {
             return Err(format!("expected {expected}, got {actual}"));
         }
+    }
+    Ok(())
+}
+
+/// Gradient golden (issue 0008): x (requires_grad leaf, set POST-transfer
+/// — the .to() non-leaf trap) -> op -> loss (sum, or (y*y).sum() for
+/// degenerate-loss ops) -> backward -> grad, compared exactly vs Python.
+fn run_grad_case(case: &serde_json::Value) -> Result<(), String> {
+    let mut registry = Registry::new();
+    let op = case["grad_op"].as_str().expect("grad_op");
+    let input = &case["input"];
+    let kind = convert::parse_kind(input["dtype"].as_str())
+        .map_err(|e| format!("bad input dtype: {e}"))?;
+    let tensor = convert::json_to_tensor(&input["data"], kind, Device::Mps)
+        .map_err(|e| format!("bad input data: {e}"))?
+        .set_requires_grad(true);
+    let x = registry.insert(tensor);
+
+    let run = |registry: &mut Registry, name: &str, handles: &[String], params| {
+        let spec = nutorch_ops::find(name).ok_or_else(|| format!("op {name} not in table"))?;
+        match dispatch::execute_table(registry, spec, handles, &params) {
+            nutorchd::protocol::Response::Handles { handles, .. } => Ok(handles),
+            nutorchd::protocol::Response::Value { .. } => Ok(Vec::new()),
+            other => Err(format!("{name}: unexpected response {other:?}")),
+        }
+    };
+
+    let params = case["params"].as_object().cloned().unwrap_or_default();
+    let operands: Vec<String> = if case["with_self"].as_bool().unwrap_or(false) {
+        vec![x.clone(), x.clone()]
+    } else {
+        vec![x.clone()]
+    };
+    let y = run(&mut registry, op, &operands, params)?
+        .first()
+        .cloned()
+        .ok_or("op produced no handle")?;
+
+    let loss = if case["square_loss"].as_bool().unwrap_or(false) {
+        let squared = run(
+            &mut registry,
+            "mul",
+            &[y.clone(), y.clone()],
+            serde_json::Map::new(),
+        )?
+        .first()
+        .cloned()
+        .ok_or("mul produced no handle")?;
+        run(&mut registry, "sum", &[squared], serde_json::Map::new())?
+            .first()
+            .cloned()
+            .ok_or("sum produced no handle")?
+    } else {
+        run(&mut registry, "sum", &[y], serde_json::Map::new())?
+            .first()
+            .cloned()
+            .ok_or("sum produced no handle")?
+    };
+
+    run(&mut registry, "backward", &[loss], serde_json::Map::new())?;
+    let grad = run(&mut registry, "grad", &[x], serde_json::Map::new())?
+        .first()
+        .cloned()
+        .ok_or("grad produced no handle")?;
+
+    let cpu = registry
+        .get(&grad)
+        .expect("grad handle resolves")
+        .f_to_device(Device::Cpu)
+        .map_err(|e| format!("cpu copy failed: {e}"))?;
+    let actual = convert::tensor_to_json(&cpu).map_err(|e| format!("serialize: {e}"))?;
+    let expected = &case["expect_grad"];
+    if &actual != expected {
+        return Err(format!("expected grad {expected}, got {actual}"));
     }
     Ok(())
 }

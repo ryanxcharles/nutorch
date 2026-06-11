@@ -16,6 +16,7 @@ pub enum Bespoke {
     Tensor {
         data: serde_json::Value,
         dtype: Option<String>,
+        requires_grad: Option<bool>,
     },
     Value {
         handle: String,

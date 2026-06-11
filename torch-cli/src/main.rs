@@ -147,7 +147,7 @@ fn print_response(response: &serde_json::Value) {
 
 /// Presence-only flags on bespoke (non-table) ops; all other bespoke
 /// flags take a value.
-const BESPOKE_PRESENCE_FLAGS: &[&str] = &["all", "meta"];
+const BESPOKE_PRESENCE_FLAGS: &[&str] = &["all", "meta", "requires_grad"];
 
 struct RawArgs {
     op: String,
@@ -399,16 +399,21 @@ fn build_bespoke_request(args: &RawArgs) -> Result<serde_json::Value, String> {
     match args.op.as_str() {
         "tensor" => {
             let mut dtype = None;
+            let mut requires_grad = false;
             for (name, value) in &args.flags {
                 match name.as_str() {
                     "dtype" => dtype = value.clone(),
+                    "requires_grad" => requires_grad = true,
                     other => return Err(format!("unknown flag: --{other}")),
                 }
             }
             let data_text = positional_or_stdin(args, 0, "tensor data")?;
             let data: serde_json::Value = serde_json::from_str(&data_text)
                 .map_err(|e| format!("tensor data is not valid JSON: {e}"))?;
-            Ok(serde_json::json!({ "op": "tensor", "data": data, "dtype": dtype }))
+            Ok(serde_json::json!({
+                "op": "tensor", "data": data, "dtype": dtype,
+                "requires_grad": requires_grad,
+            }))
         }
         "value" => {
             let mut meta = false;

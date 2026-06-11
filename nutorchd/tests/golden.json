@@ -6262,5 +6262,293 @@
         ]
       ]
     }
+  },
+  {
+    "name": "ag_sin",
+    "grad_op": "sin",
+    "input": {
+      "data": [
+        0.3,
+        1.0,
+        2.0
+      ],
+      "dtype": "float32"
+    },
+    "params": {},
+    "with_self": false,
+    "square_loss": false,
+    "expect_grad": [
+      0.9553364515304565,
+      0.5403022766113281,
+      -0.416146844625473
+    ]
+  },
+  {
+    "name": "ag_exp",
+    "grad_op": "exp",
+    "input": {
+      "data": [
+        -1.0,
+        0.0,
+        1.0
+      ],
+      "dtype": "float32"
+    },
+    "params": {},
+    "with_self": false,
+    "square_loss": false,
+    "expect_grad": [
+      0.3678794503211975,
+      1.0,
+      2.7182819843292236
+    ]
+  },
+  {
+    "name": "ag_sigmoid",
+    "grad_op": "sigmoid",
+    "input": {
+      "data": [
+        -2.0,
+        0.0,
+        2.0
+      ],
+      "dtype": "float32"
+    },
+    "params": {},
+    "with_self": false,
+    "square_loss": false,
+    "expect_grad": [
+      0.10499358177185059,
+      0.25,
+      0.10499362647533417
+    ]
+  },
+  {
+    "name": "ag_tanh",
+    "grad_op": "tanh",
+    "input": {
+      "data": [
+        -1.0,
+        0.0,
+        1.0
+      ],
+      "dtype": "float32"
+    },
+    "params": {},
+    "with_self": false,
+    "square_loss": false,
+    "expect_grad": [
+      0.4199743866920471,
+      1.0,
+      0.4199743866920471
+    ]
+  },
+  {
+    "name": "ag_sqrt",
+    "grad_op": "sqrt",
+    "input": {
+      "data": [
+        1.0,
+        4.0,
+        9.0
+      ],
+      "dtype": "float32"
+    },
+    "params": {},
+    "with_self": false,
+    "square_loss": false,
+    "expect_grad": [
+      0.5,
+      0.25,
+      0.1666666716337204
+    ]
+  },
+  {
+    "name": "ag_relu",
+    "grad_op": "relu",
+    "input": {
+      "data": [
+        -2.0,
+        0.5,
+        3.0
+      ],
+      "dtype": "float32"
+    },
+    "params": {},
+    "with_self": false,
+    "square_loss": false,
+    "expect_grad": [
+      0.0,
+      1.0,
+      1.0
+    ]
+  },
+  {
+    "name": "ag_log",
+    "grad_op": "log",
+    "input": {
+      "data": [
+        0.5,
+        1.0,
+        4.0
+      ],
+      "dtype": "float32"
+    },
+    "params": {},
+    "with_self": false,
+    "square_loss": false,
+    "expect_grad": [
+      2.0,
+      1.0,
+      0.25
+    ]
+  },
+  {
+    "name": "ag_mul_self",
+    "grad_op": "mul",
+    "input": {
+      "data": [
+        1.0,
+        2.0,
+        3.0
+      ],
+      "dtype": "float32"
+    },
+    "params": {},
+    "with_self": true,
+    "square_loss": false,
+    "expect_grad": [
+      2.0,
+      4.0,
+      6.0
+    ]
+  },
+  {
+    "name": "ag_mm_self",
+    "grad_op": "mm",
+    "input": {
+      "data": [
+        [
+          1.0,
+          2.0
+        ],
+        [
+          3.0,
+          4.0
+        ]
+      ],
+      "dtype": "float32"
+    },
+    "params": {},
+    "with_self": true,
+    "square_loss": false,
+    "expect_grad": [
+      [
+        7.0,
+        11.0
+      ],
+      [
+        9.0,
+        13.0
+      ]
+    ]
+  },
+  {
+    "name": "ag_pow2",
+    "grad_op": "pow",
+    "input": {
+      "data": [
+        1.0,
+        2.0,
+        3.0
+      ],
+      "dtype": "float32"
+    },
+    "params": {
+      "exponent": 2
+    },
+    "with_self": false,
+    "square_loss": false,
+    "expect_grad": [
+      2.0,
+      4.0,
+      6.0
+    ]
+  },
+  {
+    "name": "ag_mean",
+    "grad_op": "mean",
+    "input": {
+      "data": [
+        1.0,
+        2.0,
+        3.0,
+        4.0
+      ],
+      "dtype": "float32"
+    },
+    "params": {},
+    "with_self": false,
+    "square_loss": false,
+    "expect_grad": [
+      0.25,
+      0.25,
+      0.25,
+      0.25
+    ]
+  },
+  {
+    "name": "ag_sum_dim",
+    "grad_op": "sum",
+    "input": {
+      "data": [
+        [
+          1.0,
+          2.0
+        ],
+        [
+          3.0,
+          4.0
+        ]
+      ],
+      "dtype": "float32"
+    },
+    "params": {
+      "dim": 1
+    },
+    "with_self": false,
+    "square_loss": false,
+    "expect_grad": [
+      [
+        1.0,
+        1.0
+      ],
+      [
+        1.0,
+        1.0
+      ]
+    ]
+  },
+  {
+    "name": "ag_softmax_sq",
+    "grad_op": "softmax",
+    "input": {
+      "data": [
+        1.0,
+        2.0,
+        3.0
+      ],
+      "dtype": "float32"
+    },
+    "params": {
+      "dim": 0
+    },
+    "with_self": false,
+    "square_loss": true,
+    "expect_grad": [
+      -0.07571794837713242,
+      -0.13010476529598236,
+      0.20582273602485657
+    ]
   }
 ]
