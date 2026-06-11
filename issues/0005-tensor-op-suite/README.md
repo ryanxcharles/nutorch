@@ -175,3 +175,5 @@ inside it).
 - [Experiment 3: Reductions + comparison sweep (~35 ops), and variable-arity results](03-reductions-comparison-sweep.md)
   — **Pass** (36 ops, table 72→108; goldens 90→134 first-run; VariableHandles
   cost exactly one enum variant; zero MPS exclusions)
+- [Experiment 4: Linalg + shape/indexing sweep (~32 ops)](04-linalg-shape-sweep.md)
+  — **Designed**
