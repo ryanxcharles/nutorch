@@ -122,3 +122,5 @@ or honestly excluded.
 - [Experiment 1: Typed handles and the typed registry](01-typed-handles.md) —
   **Pass** (every handle now tensor://…; the error quartet live; goldens
   byte-identical; zero client/protocol/ops changes)
+- [Experiment 2: The module foundation — linear, activations, sequential, forward](02-module-foundation.md)
+  — **Designed**
