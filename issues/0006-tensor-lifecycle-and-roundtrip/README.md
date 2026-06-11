@@ -111,3 +111,5 @@ formats for very large tensors.
 - [Experiment 1: `torch free` — the first verb that removes](01-torch-free.md) —
   **Pass** (atomic free by arg/stdin/--all; the rm convention; registry
   accounting verified to the byte; op table untouched)
+- [Experiment 2: `torch tensors` — the listing that makes `free` targetable](02-torch-tensors.md)
+  — **Designed**
