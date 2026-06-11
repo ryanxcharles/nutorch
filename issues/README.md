@@ -2,8 +2,9 @@
 
 ## Open
 
-| # | Title | Opened |
-| - | ----- | ------ |
+| #                               | Title                                                    | Opened     |
+| ------------------------------- | -------------------------------------------------------- | ---------- |
+| [0009](0009-nn-optim/README.md) | nn/optim — modules and optimizers as first-class objects | 2026-06-11 |
 
 ## Closed
 
