@@ -2,8 +2,9 @@
 
 ## Open
 
-| # | Title | Opened |
-| - | ----- | ------ |
+| #                               | Title                               | Opened     |
+| ------------------------------- | ----------------------------------- | ---------- |
+| [0008](0008-autograd/README.md) | Autograd — gradients from the shell | 2026-06-11 |
 
 ## Closed
 
