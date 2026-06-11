@@ -147,7 +147,7 @@ fn print_response(response: &serde_json::Value) {
 
 /// Presence-only flags on bespoke (non-table) ops; all other bespoke
 /// flags take a value.
-const BESPOKE_PRESENCE_FLAGS: &[&str] = &["all"];
+const BESPOKE_PRESENCE_FLAGS: &[&str] = &["all", "meta"];
 
 struct RawArgs {
     op: String,
@@ -411,11 +411,15 @@ fn build_bespoke_request(args: &RawArgs) -> Result<serde_json::Value, String> {
             Ok(serde_json::json!({ "op": "tensor", "data": data, "dtype": dtype }))
         }
         "value" => {
-            if let Some((name, _)) = args.flags.first() {
-                return Err(format!("unknown flag: --{name}"));
+            let mut meta = false;
+            for (name, _) in &args.flags {
+                match name.as_str() {
+                    "meta" => meta = true,
+                    other => return Err(format!("unknown flag: --{other}")),
+                }
             }
             let handle = positional_or_stdin(args, 0, "tensor handle")?;
-            Ok(serde_json::json!({ "op": "value", "handle": handle }))
+            Ok(serde_json::json!({ "op": "value", "handle": handle, "meta": meta }))
         }
         "free" => {
             let mut all = false;

@@ -99,16 +99,12 @@ pub fn handle_request(
         Request::Bespoke(bespoke) => match bespoke {
             Bespoke::Tensor { data, dtype } => {
                 lifecycle.lock().unwrap().touch();
-                let kind = match convert::parse_kind(dtype.as_deref()) {
-                    Ok(k) => k,
-                    Err(e) => return (Response::error("bad_dtype", e), false),
-                };
-                match convert::json_to_tensor(&data, kind, Device::Mps) {
+                match build_input_tensor(&data, dtype.as_deref()) {
                     Ok(tensor) => (Response::handle(registry.insert(tensor)), false),
-                    Err(e) => (Response::error("bad_argument", e), false),
+                    Err((code, message)) => (Response::error(code, message), false),
                 }
             }
-            Bespoke::Value { handle } => {
+            Bespoke::Value { handle, meta } => {
                 lifecycle.lock().unwrap().touch();
                 registry.touch(&handle);
                 match registry.get(&handle) {
@@ -123,7 +119,20 @@ pub fn handle_request(
                             }
                         };
                         match convert::tensor_to_json(&cpu) {
-                            Ok(value) => (Response::value(value), false),
+                            Ok(data) => {
+                                // --meta: the envelope a round-trip can carry
+                                // its dtype in (issue 0006).
+                                let value = if meta.unwrap_or(false) {
+                                    serde_json::json!({
+                                        "dtype": convert::kind_name(cpu.kind()),
+                                        "shape": cpu.size(),
+                                        "data": data,
+                                    })
+                                } else {
+                                    data
+                                };
+                                (Response::value(value), false)
+                            }
                             Err(e) => (Response::error("torch_error", e), false),
                         }
                     }
@@ -232,6 +241,90 @@ pub fn handle_request(
 /// by `.log` (nutorchd.sock -> nutorchd.log).
 pub fn log_path_for(socket: &Path) -> PathBuf {
     socket.with_extension("log")
+}
+
+/// Build a tensor from `torch tensor` input: a bare JSON array/scalar, or
+/// the `--meta` envelope `{"dtype":…,"shape":…,"data":…}` (issue 0006).
+/// Envelope recognition is unambiguous: json_to_tensor rejects ALL objects,
+/// so no legitimate non-envelope object input exists.
+fn build_input_tensor(
+    data: &serde_json::Value,
+    dtype_flag: Option<&str>,
+) -> Result<Tensor, (&'static str, String)> {
+    let (payload, envelope_dtype, envelope_shape) = match data.as_object() {
+        Some(object) if object.contains_key("data") => {
+            let envelope_dtype = match object.get("dtype") {
+                None => None,
+                Some(serde_json::Value::String(s)) => Some(s.clone()),
+                Some(other) => {
+                    return Err((
+                        "bad_argument",
+                        format!("envelope dtype must be a string, got {other}"),
+                    ))
+                }
+            };
+            let envelope_shape = match object.get("shape") {
+                None => None,
+                Some(serde_json::Value::Array(dims)) => {
+                    let dims: Result<Vec<i64>, _> = dims
+                        .iter()
+                        .map(|d| {
+                            d.as_i64().ok_or((
+                                "bad_argument",
+                                format!("envelope shape must be integers, got {d}"),
+                            ))
+                        })
+                        .collect();
+                    Some(dims?)
+                }
+                Some(other) => {
+                    return Err((
+                        "bad_argument",
+                        format!("envelope shape must be an array, got {other}"),
+                    ))
+                }
+            };
+            (&object["data"], envelope_dtype, envelope_shape)
+        }
+        Some(_) => {
+            return Err((
+                "bad_argument",
+                "object input must be a {\"dtype\", \"shape\", \"data\"} envelope".to_string(),
+            ))
+        }
+        None => (data, None, None),
+    };
+
+    // Explicit over implicit: a --dtype flag that CONFLICTS with the
+    // envelope's dtype is ambiguity, and ambiguity errors.
+    let effective_dtype = match (envelope_dtype.as_deref(), dtype_flag) {
+        (Some(a), Some(b)) if a != b => {
+            return Err((
+                "bad_argument",
+                format!("envelope dtype {a} conflicts with --dtype {b}"),
+            ))
+        }
+        (Some(a), _) => Some(a.to_string()),
+        (None, Some(b)) => Some(b.to_string()),
+        (None, None) => None,
+    };
+    let explicit = match effective_dtype.as_deref() {
+        Some(name) => Some(convert::parse_kind(Some(name)).map_err(|e| ("bad_dtype", e))?),
+        None => None,
+    };
+    let kind = convert::resolve_kind(payload, explicit).map_err(|e| ("bad_argument", e))?;
+    let tensor =
+        convert::json_to_tensor(payload, kind, Device::Mps).map_err(|e| ("bad_argument", e))?;
+    if let Some(expected) = envelope_shape {
+        let actual = tensor.size();
+        if actual != expected {
+            return Err((
+                "bad_argument",
+                format!("envelope shape {expected:?} does not match data shape {actual:?}"),
+            ));
+        }
+    }
+    Ok(tensor)
 }
 
 /// nutorchd is GPU-only (issue 0003): Mac-only for now, so the GPU is MPS.
@@ -1680,5 +1773,120 @@ mod tensors_listing_semantics {
         let _ = dispatch(&mut registry, &lifecycle, json!({"op":"tensors"}));
         assert!(idle_of(&registry, &a) >= 1);
         assert!(lifecycle.lock().unwrap().idle_secs() >= lease_idle_before);
+    }
+}
+
+#[cfg(test)]
+mod roundtrip_semantics {
+    use super::*;
+    use serde_json::json;
+
+    fn cpu_json(registry: &Registry, handle: &str) -> serde_json::Value {
+        let cpu = registry
+            .get(handle)
+            .unwrap()
+            .f_to_device(Device::Cpu)
+            .unwrap();
+        convert::tensor_to_json(&cpu).unwrap()
+    }
+
+    #[test]
+    fn bool_data_infers_bool_and_round_trips() {
+        let tensor = build_input_tensor(&json!([true, false, true]), None).unwrap();
+        assert_eq!(tensor.kind(), Kind::Bool);
+        let mut registry = Registry::new();
+        let h = registry.insert(tensor);
+        assert_eq!(cpu_json(&registry, &h), json!([true, false, true]));
+    }
+
+    #[test]
+    fn mixed_bool_and_number_without_dtype_errors() {
+        let err = build_input_tensor(&json!([true, 1]), None).unwrap_err();
+        assert_eq!(err.0, "bad_argument");
+        assert!(err.1.contains("mixed booleans and numbers"));
+    }
+
+    #[test]
+    fn explicit_dtype_casts_both_ways_like_pytorch() {
+        // numbers -> bool via != 0 (the [2,0,-1] case proves != 0, not == 1)
+        let t = build_input_tensor(&json!([0, 1, 2]), Some("bool")).unwrap();
+        let mut registry = Registry::new();
+        let h = registry.insert(t);
+        assert_eq!(cpu_json(&registry, &h), json!([false, true, true]));
+        let t = build_input_tensor(&json!([2, 0, -1]), Some("bool")).unwrap();
+        let h = registry.insert(t);
+        assert_eq!(cpu_json(&registry, &h), json!([true, false, true]));
+        // bools -> float32
+        let t = build_input_tensor(&json!([true, false]), Some("float32")).unwrap();
+        assert_eq!(t.kind(), Kind::Float);
+        let h = registry.insert(t);
+        assert_eq!(cpu_json(&registry, &h), json!([1.0, 0.0]));
+    }
+
+    #[test]
+    fn non_finite_tokens_round_trip_bit_exactly() {
+        let t = build_input_tensor(&json!(["NaN", "Infinity", "-Infinity", 1.5]), None).unwrap();
+        assert_eq!(t.kind(), Kind::Float);
+        let mut registry = Registry::new();
+        let h = registry.insert(t);
+        // NaN -> NaN, ±inf -> ±inf, finite untouched — and NO null anywhere.
+        assert_eq!(
+            cpu_json(&registry, &h),
+            json!(["NaN", "Infinity", "-Infinity", 1.5])
+        );
+        // Constructed non-finite values (0-division) export as tokens too.
+        let spec = nutorch_ops::find("div").unwrap();
+        let a = registry.insert(
+            convert::json_to_tensor(&json!([0.0, 1.0, -1.0]), Kind::Float, Device::Mps).unwrap(),
+        );
+        let zero = registry.insert(
+            convert::json_to_tensor(&json!([0.0, 0.0, 0.0]), Kind::Float, Device::Mps).unwrap(),
+        );
+        let response = execute_table(&mut registry, spec, &[a, zero], &serde_json::Map::new());
+        let out = match response {
+            Response::Handles { handles, .. } => handles[0].clone(),
+            other => panic!("expected handles, got {other:?}"),
+        };
+        assert_eq!(
+            cpu_json(&registry, &out),
+            json!(["NaN", "Infinity", "-Infinity"])
+        );
+    }
+
+    #[test]
+    fn non_finite_tokens_reject_integer_dtypes() {
+        let err = build_input_tensor(&json!(["NaN"]), Some("int64")).unwrap_err();
+        assert_eq!(err.0, "bad_argument");
+    }
+
+    #[test]
+    fn envelope_round_trip_preserves_dtype() {
+        for (dtype, data) in [("int64", json!([1, 2, 3])), ("bool", json!([true, false]))] {
+            let envelope = json!({"dtype": dtype, "data": data});
+            let tensor = build_input_tensor(&envelope, None).unwrap();
+            assert_eq!(convert::kind_name(tensor.kind()), dtype);
+        }
+    }
+
+    #[test]
+    fn envelope_conflicts_and_mismatches_error() {
+        // Conflicting dtype flag.
+        let envelope = json!({"dtype": "int64", "data": [1, 2]});
+        let err = build_input_tensor(&envelope, Some("float32")).unwrap_err();
+        assert_eq!(err.0, "bad_argument");
+        assert!(err.1.contains("conflicts"));
+        // Identical dtype flag is fine.
+        assert!(build_input_tensor(&envelope, Some("int64")).is_ok());
+        // Wrong shape.
+        let envelope = json!({"shape": [2, 3], "data": [1, 2, 3, 4, 5, 6]});
+        let err = build_input_tensor(&envelope, None).unwrap_err();
+        assert_eq!(err.0, "bad_argument");
+        assert!(err.1.contains("does not match"));
+        // Matching shape is fine.
+        let envelope = json!({"shape": [3], "data": [1, 2, 3]});
+        assert!(build_input_tensor(&envelope, None).is_ok());
+        // Object without "data" is rejected.
+        let err = build_input_tensor(&json!({"values": [1]}), None).unwrap_err();
+        assert_eq!(err.0, "bad_argument");
     }
 }

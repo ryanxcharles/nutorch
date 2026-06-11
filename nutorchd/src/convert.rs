@@ -42,9 +42,109 @@ pub fn parse_kind(dtype: Option<&str>) -> Result<Kind, String> {
         Some("float64") | Some("double") => Ok(Kind::Double),
         Some("int32") | Some("int") => Ok(Kind::Int),
         Some("int64") | Some("long") => Ok(Kind::Int64),
+        Some("bool") => Ok(Kind::Bool),
         Some(s) => Err(format!(
-            "invalid dtype: {s} (expected float32, float64, int32, or int64)"
+            "invalid dtype: {s} (expected float32, float64, int32, int64, or bool)"
         )),
+    }
+}
+
+/// The non-finite JSON dialect (issue 0006): JSON has no NaN/Infinity, and
+/// serde maps them to null — silent corruption. These three string tokens
+/// are emitted by `tensor_to_json` and accepted by `json_to_tensor`.
+fn token_to_f64(token: &str) -> Option<f64> {
+    match token {
+        "NaN" => Some(f64::NAN),
+        "Infinity" => Some(f64::INFINITY),
+        "-Infinity" => Some(f64::NEG_INFINITY),
+        _ => None,
+    }
+}
+
+fn f64_to_json(value: f64) -> serde_json::Value {
+    if value.is_finite() {
+        serde_json::Value::from(value)
+    } else if value.is_nan() {
+        serde_json::Value::String("NaN".to_string())
+    } else if value > 0.0 {
+        serde_json::Value::String("Infinity".to_string())
+    } else {
+        serde_json::Value::String("-Infinity".to_string())
+    }
+}
+
+/// Decide the tensor kind for input `data` (issue 0006). With an explicit
+/// dtype, PyTorch casting rules apply and any leaf mix is fine — except
+/// non-finite tokens cast to integer kinds, which PyTorch itself rejects.
+/// Without one: all-bool data infers Bool; bool/number mixes error (no
+/// silent cross-kind inference — carried principle 4; PyTorch would infer
+/// int64 here, a recorded deviation); otherwise the float32 default.
+pub fn resolve_kind(data: &serde_json::Value, explicit: Option<Kind>) -> Result<Kind, String> {
+    let mut bools = 0usize;
+    let mut numbers = 0usize;
+    let mut tokens = 0usize;
+    classify_leaves(data, &mut bools, &mut numbers, &mut tokens)?;
+    if let Some(kind) = explicit {
+        let is_integer = matches!(
+            kind,
+            Kind::Int | Kind::Int8 | Kind::Int16 | Kind::Int64 | Kind::Uint8
+        );
+        if is_integer && tokens > 0 {
+            return Err("non-finite values cannot be cast to an integer dtype".to_string());
+        }
+        return Ok(kind);
+    }
+    if bools > 0 && (numbers > 0 || tokens > 0) {
+        return Err("mixed booleans and numbers (pass an explicit --dtype to cast)".to_string());
+    }
+    if bools > 0 {
+        Ok(Kind::Bool)
+    } else {
+        Ok(Kind::Float)
+    }
+}
+
+fn classify_leaves(
+    value: &serde_json::Value,
+    bools: &mut usize,
+    numbers: &mut usize,
+    tokens: &mut usize,
+) -> Result<(), String> {
+    match value {
+        serde_json::Value::Array(items) => {
+            for item in items {
+                classify_leaves(item, bools, numbers, tokens)?;
+            }
+            Ok(())
+        }
+        serde_json::Value::Bool(_) => {
+            *bools += 1;
+            Ok(())
+        }
+        serde_json::Value::Number(_) => {
+            *numbers += 1;
+            Ok(())
+        }
+        serde_json::Value::String(s) if token_to_f64(s).is_some() => {
+            *tokens += 1;
+            Ok(())
+        }
+        other => Err(format!(
+            "input must be numbers, booleans, or the non-finite tokens \"NaN\"/\"Infinity\"/\"-Infinity\", got {other}"
+        )),
+    }
+}
+
+/// One scalar leaf as f64: numbers, booleans (0/1), or a non-finite token.
+fn leaf_to_f64(value: &serde_json::Value) -> Result<f64, String> {
+    if let Some(f) = value.as_f64() {
+        return Ok(f);
+    }
+    match value {
+        serde_json::Value::Bool(b) => Ok(if *b { 1.0 } else { 0.0 }),
+        serde_json::Value::String(s) => token_to_f64(s)
+            .ok_or_else(|| format!("expected a number or a non-finite token, got \"{s}\"")),
+        other => Err(format!("expected number, got {other}")),
     }
 }
 
@@ -71,7 +171,8 @@ pub fn json_to_tensor(
                     .map_err(|e| format!("ragged or mismatched nested list: {}", tch_error(e)))
             } else {
                 // Flat list. v1 fidelity: all-integers build an i64 buffer,
-                // anything float builds f64; both then cast to `kind`.
+                // anything else builds f64 (booleans as 0/1, the non-finite
+                // tokens as their floats); both then cast to `kind`.
                 let all_ints = items.iter().all(|v| v.is_i64() || v.is_u64());
                 let tensor = if all_ints {
                     let data: Result<Vec<i64>, String> = items
@@ -83,13 +184,7 @@ pub fn json_to_tensor(
                         .collect();
                     Tensor::from_slice(&data?)
                 } else {
-                    let data: Result<Vec<f64>, String> = items
-                        .iter()
-                        .map(|v| {
-                            v.as_f64()
-                                .ok_or_else(|| format!("expected number, got {v}"))
-                        })
-                        .collect();
+                    let data: Result<Vec<f64>, String> = items.iter().map(leaf_to_f64).collect();
                     Tensor::from_slice(&data?)
                 };
                 tensor
@@ -99,13 +194,13 @@ pub fn json_to_tensor(
                     .map_err(tch_error)
             }
         }
-        serde_json::Value::Number(n) => {
-            let tensor = if let Some(i) = n.as_i64() {
+        serde_json::Value::Number(_)
+        | serde_json::Value::Bool(_)
+        | serde_json::Value::String(_) => {
+            let tensor = if let Some(i) = value.as_i64() {
                 Tensor::from(i)
-            } else if let Some(f) = n.as_f64() {
-                Tensor::from(f)
             } else {
-                return Err(format!("unsupported number: {n}"));
+                Tensor::from(leaf_to_f64(value)?)
             };
             tensor
                 .f_to_kind(kind)
@@ -114,7 +209,7 @@ pub fn json_to_tensor(
                 .map_err(tch_error)
         }
         other => Err(format!(
-            "input must be a number or a (nested) list of numbers, got {other}"
+            "input must be a number, boolean, or a (nested) list of them, got {other}"
         )),
     }
 }
@@ -131,9 +226,7 @@ pub fn tensor_to_json(tensor: &Tensor) -> Result<serde_json::Value, String> {
             Kind::Int | Kind::Int8 | Kind::Int16 | Kind::Int64 | Kind::Uint8 => {
                 Ok(serde_json::Value::from(tensor.int64_value(&[])))
             }
-            Kind::Float | Kind::Double | Kind::Half => {
-                Ok(serde_json::Value::from(tensor.double_value(&[])))
-            }
+            Kind::Float | Kind::Double | Kind::Half => Ok(f64_to_json(tensor.double_value(&[]))),
             // Comparison ops return Bool tensors (issue 0005).
             Kind::Bool => Ok(serde_json::Value::Bool(tensor.int64_value(&[]) != 0)),
             _ => Err(format!("cannot convert tensor of type {kind:?}")),

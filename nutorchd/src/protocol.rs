@@ -19,6 +19,7 @@ pub enum Bespoke {
     },
     Value {
         handle: String,
+        meta: Option<bool>,
     },
     /// Free tensors by handle, or all of them. Exactly one of the two
     /// fields must be meaningfully present (validated in dispatch;

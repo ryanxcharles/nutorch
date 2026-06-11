@@ -115,4 +115,5 @@ formats for very large tensors.
   — **Pass** (oldest-first census with per-tensor age/idle; bool dtype listed
   correctly; the awk→free composition works; no spawn, no lease touch)
 - [Experiment 3: The lossless round-trip — bool, non-finite, and the meta envelope](03-lossless-roundtrip.md)
-  — **Designed**
+  — **Pass** (bool, non-finite tokens, and the dtype envelope all round-trip
+  losslessly; the export→restart→re-import valve executed live and documented)

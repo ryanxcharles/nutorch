@@ -130,3 +130,66 @@ pattern. One Optional and one Nit folded in: the `value`-arm flag handling is
 now spelled out as a two-site edit (the Experiment-1 `--all` pattern), and the
 bool-cast unit test gains a negative/non-unit case (`[2,0,-1]` →
 `[true,false,true]`) proving `!= 0` rather than `== 1`.
+
+## Result
+
+**Result:** Pass
+
+All three recorded gaps closed, end to end, plus the strand-4 README section
+with verbatim-proven commands.
+
+- **Unit tests** (49 daemon tests, up from 42): bool inference + round-trip; the
+  mixed-without-dtype error; both cast directions matching PyTorch including the
+  `[2,0,-1]` → `[true,false,true]` case proving `!= 0`; all three tokens
+  round-tripping bit-exactly (including through a real 0-division on MPS);
+  tokens rejecting integer dtypes; envelope dtype preservation for int64 AND
+  bool; conflict/mismatch/object-without-data errors with identical-dtype and
+  matching-shape accepted.
+- **Live, the issue's acceptance**:
+  - bool gap: `torch eq … | torch value` → `[true,false,true]` → fed back via
+    `torch tensor` → listed as dtype `bool` by `torch tensors`;
+  - non-finite gap: `div` by zero → `["NaN","Infinity","-Infinity"]` (no `null`
+    anywhere) → re-imported → `isnan`/`isposinf`/`isneginf` report identical
+    truth per position;
+  - dtype gap: `torch value --meta` emits the envelope; re-import preserves
+    int64 with no `--dtype` flag;
+  - envelope conflict and shape mismatch both error with named values;
+  - **the full valve**: export `--meta` → `torch daemon restart` → re-import →
+    `[10,20,30]`, dtype int64 — the documented workflow, executed.
+- **Hygiene**: build 0 warnings; fmt/dprint clean; 207 goldens untouched and
+  green (the generator emits only finite values, unaffected by the dialect);
+  `v1/` untouched.
+- **README**: the "Saving tensors and reclaiming memory" section landed with
+  exactly the commands proven above, including the dialect note. (Result-review
+  finding: the first attempt to add this section silently no-op'd — a
+  patternless `str.replace` against dprint-rewrapped text, the project's
+  recurring escape, caught here by the result gate because the reviewer greps
+  artifacts rather than trusting the Result. The section now exists,
+  dprint-clean, and its commands were re-run verbatim.)
+
+## Conclusion
+
+The round-trip is lossless: every dtype the registry holds (bool included),
+every value a float tensor can contain (non-finite included), and the dtype
+itself (via the envelope) all survive `torch value` → file → `torch tensor`.
+With Experiments 1–3 together, all four strands of the issue are delivered:
+free, the census, the lossless round-trip, and the documented relief valve. The
+issue can close.
+
+## Result Review
+
+**Reviewer:** `adversarial-reviewer` subagent (fresh context, read-only),
+reviewing the pre-commit working tree. **First pass: CHANGES REQUIRED** — three
+Required findings, all one root cause: the README strand-4 section had silently
+failed to land (a patternless `str.replace` no-op — caught because the reviewer
+greps artifacts instead of trusting the Result), so the Result's claim was false
+and the dialect-documentation constraint was violated. **Fixed**: the section
+written for real (asserting replace), dprint-clean, its commands re-run
+verbatim; the Result corrected to disclose the failure. **Re-review (fresh
+context): APPROVED** — all three findings confirmed fixed, the export→re-import
+pair and the full valve re-executed live with dtype preserved, non-finite tokens
+bit-identical, and no regressions (49 unit + 207 golden tests green). Everything
+substantive had already held in the first pass: both gap closures live, wire
+back-compat for meta-less value requests, the where/masked_select no-regression
+on real Bool conds, and the [2,0,-1] cast proof. **Close readiness: READY** —
+all four strands discharged, Carried Constraints honored.

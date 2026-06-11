@@ -43,6 +43,30 @@ The default TTL is configurable via `NUTORCHD_TTL` (e.g. `30m`, `2h`, `none`).
 Run `torch ops` to list every available operation, and `torch <op> --help` for
 any one of them.
 
+## Saving tensors and reclaiming memory
+
+Tensors live exactly as long as the daemon (default idle TTL: 1 hour).
+Persistence is shell redirection — export the tensors you care about, never the
+intermediates:
+
+```bash
+torch value --meta $w > w.json          # export (dtype travels inside)
+w=$(torch tensor "$(cat w.json)")       # re-import, dtype preserved
+```
+
+Reclaim memory selectively or wholesale:
+
+```bash
+torch tensors            # list: handle, shape, dtype, bytes, age, idle
+torch free $t1 $t2       # free specific tensors (or pipe handles in)
+torch free --all         # empty the registry
+torch daemon restart     # the coarse valve: export, restart, re-import
+```
+
+Note: JSON has no NaN/Infinity, so `torch value` writes the string tokens
+`"NaN"`, `"Infinity"`, and `"-Infinity"` for non-finite values, and
+`torch tensor` reads them back — round-trips are lossless.
+
 ## Status
 
 **Proof of concept working** (issue 0002): daemon, thin client, six ops
