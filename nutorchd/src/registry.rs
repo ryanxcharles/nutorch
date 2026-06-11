@@ -112,6 +112,7 @@ fn mint(kind: HandleKind, id: &str) -> String {
 pub enum Object {
     Tensor(Tensor),
     Module(crate::nn::NnModule),
+    Optimizer(crate::nn::Optimizer),
 }
 
 impl Object {
@@ -119,6 +120,7 @@ impl Object {
         match self {
             Object::Tensor(_) => HandleKind::Tensor,
             Object::Module(_) => HandleKind::Module,
+            Object::Optimizer(_) => HandleKind::Optimizer,
         }
     }
 }
@@ -156,6 +158,37 @@ impl Registry {
 
     pub fn insert_module(&mut self, module: crate::nn::NnModule) -> String {
         self.insert_object(Object::Module(module))
+    }
+
+    pub fn insert_optimizer(&mut self, optimizer: crate::nn::Optimizer) -> String {
+        self.insert_object(Object::Optimizer(optimizer))
+    }
+
+    pub fn get_optimizer_mut(&mut self, handle: &str) -> Result<&mut crate::nn::Optimizer, Lookup> {
+        // Mirror lookup() but mutable; same kind discipline.
+        let (kind, id) = parse_handle(handle)?;
+        let entry = self
+            .entries
+            .get_mut(id)
+            .ok_or_else(|| Lookup::Unknown(handle.to_string()))?;
+        let actual = entry.object.kind();
+        if kind != actual || kind != HandleKind::Optimizer {
+            let expected = if kind != actual {
+                kind
+            } else {
+                HandleKind::Optimizer
+            };
+            return Err(Lookup::WrongKind {
+                handle: handle.to_string(),
+                actual,
+                expected,
+            });
+        }
+        entry.touched = Instant::now();
+        match &mut entry.object {
+            Object::Optimizer(optimizer) => Ok(optimizer),
+            _ => unreachable!("kind-checked"),
+        }
     }
 
     fn insert_object(&mut self, object: Object) -> String {
@@ -272,6 +305,7 @@ impl Registry {
             .map(|e| match &e.object {
                 Object::Tensor(t) => t.numel() as u64 * t.kind().elt_size_in_bytes() as u64,
                 Object::Module(m) => m.param_bytes(),
+                Object::Optimizer(o) => o.state_bytes(),
             })
             .sum()
     }
@@ -283,7 +317,7 @@ impl Registry {
         rows.sort_by_key(|(_, entry)| entry.created);
         rows.into_iter()
             .filter_map(|(id, entry)| match &entry.object {
-                Object::Module(_) => None,
+                Object::Module(_) | Object::Optimizer(_) => None,
                 Object::Tensor(t) => Some(Listing {
                     handle: mint(HandleKind::Tensor, id),
                     kind: HandleKind::Tensor,

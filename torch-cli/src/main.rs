@@ -147,7 +147,14 @@ fn print_response(response: &serde_json::Value) {
 
 /// Presence-only flags on bespoke (non-table) ops; all other bespoke
 /// flags take a value.
-const BESPOKE_PRESENCE_FLAGS: &[&str] = &["all", "meta", "requires_grad", "no-bias", "no_bias"];
+const BESPOKE_PRESENCE_FLAGS: &[&str] = &[
+    "all",
+    "meta",
+    "requires_grad",
+    "no-bias",
+    "no_bias",
+    "nesterov",
+];
 
 struct RawArgs {
     op: String,
@@ -452,6 +459,13 @@ fn build_bespoke_request(args: &RawArgs) -> Result<serde_json::Value, String> {
             }
             Ok(serde_json::json!({ "op": "free", "handles": handles }))
         }
+        "step" => {
+            if let Some((name, _)) = args.flags.first() {
+                return Err(format!("unknown flag: --{name}"));
+            }
+            let optimizer = positional_or_stdin(args, 0, "optimizer handle")?;
+            Ok(serde_json::json!({ "op": "step", "optimizer": optimizer }))
+        }
         "forward" => {
             if let Some((name, _)) = args.flags.first() {
                 return Err(format!("unknown flag: --{name}"));
@@ -515,6 +529,52 @@ fn build_nn_request(args: &RawArgs) -> Result<serde_json::Value, String> {
             }
             nn_args.insert("children".into(), serde_json::json!(children));
             Ok(serde_json::json!({ "op": "nn", "kind": "sequential", "args": nn_args }))
+        }
+        "sgd" | "adam" | "adamw" | "rmsprop" => {
+            let module = args
+                .positionals
+                .get(1)
+                .cloned()
+                .ok_or(format!("usage: torch nn {kind} <nn://module> [--lr …]"))?;
+            nn_args.insert("module".into(), module.into());
+            for (name, value) in &args.flags {
+                match (name.as_str(), value) {
+                    ("nesterov", _) => {
+                        nn_args.insert("nesterov".into(), true.into());
+                    }
+                    (flag, Some(text)) => {
+                        let key = flag.replace('-', "_");
+                        let number: f64 = text
+                            .parse()
+                            .map_err(|_| format!("nn {kind}: --{flag} must be a number"))?;
+                        nn_args.insert(key, serde_json::json!(number));
+                    }
+                    (flag, None) => return Err(format!("nn {kind}: --{flag} needs a value")),
+                }
+            }
+            Ok(serde_json::json!({ "op": "nn", "kind": kind, "args": nn_args }))
+        }
+        "zero_grad" => {
+            let handle = args
+                .positionals
+                .get(1)
+                .cloned()
+                .ok_or("usage: torch nn zero_grad <optim://…|nn://…>")?;
+            Ok(serde_json::json!({ "op": "nn_zero_grad", "handle": handle }))
+        }
+        "set_lr" => {
+            let optimizer = args
+                .positionals
+                .get(1)
+                .cloned()
+                .ok_or("usage: torch nn set_lr <optim://…> <lr>")?;
+            let lr: f64 = args
+                .positionals
+                .get(2)
+                .ok_or("usage: torch nn set_lr <optim://…> <lr>")?
+                .parse()
+                .map_err(|_| "nn set_lr: lr must be a number".to_string())?;
+            Ok(serde_json::json!({ "op": "nn_set_lr", "optimizer": optimizer, "lr": lr }))
         }
         "parameters" => {
             let module = args
@@ -762,6 +822,13 @@ fn run() -> Result<(), String> {
             ensure_daemon(&socket)?;
         }
         let response = exchange(&socket, &request)?;
+        // zero_grad/set_lr are loop verbs: quiet on success.
+        if matches!(
+            args.positionals.first().map(String::as_str),
+            Some("zero_grad") | Some("set_lr")
+        ) {
+            return Ok(());
+        }
         // nn info's value is a list of human lines, printed as lines.
         if args.positionals.first().map(String::as_str) == Some("info") {
             if let Some(lines) = response["value"].as_array() {
@@ -788,8 +855,9 @@ fn run() -> Result<(), String> {
     }
     let response = exchange(&socket, &request)?;
     // The rm convention: free prints nothing on success (the daemon's
-    // {"freed":N} stays on the wire for tooling).
-    if args.op != "free" {
+    // {"freed":N} stays on the wire for tooling); step likewise (it runs
+    // inside training loops where stdout noise is cost).
+    if args.op != "free" && args.op != "step" {
         print_response(&response);
     }
     Ok(())

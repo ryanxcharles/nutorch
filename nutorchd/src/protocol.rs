@@ -49,6 +49,19 @@ pub enum Bespoke {
     NnInfo {
         module: String,
     },
+    /// One optimizer step (issue 0009 exp 4).
+    Step {
+        optimizer: String,
+    },
+    #[serde(rename = "nn_zero_grad")]
+    NnZeroGrad {
+        handle: String,
+    },
+    #[serde(rename = "nn_set_lr")]
+    NnSetLr {
+        optimizer: String,
+        lr: f64,
+    },
     Status,
     #[serde(rename = "set_ttl")]
     SetTtl {

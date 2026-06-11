@@ -13,7 +13,7 @@ const GOLDEN: &str = include_str!("golden.json");
 #[test]
 fn golden_cases_agree_with_real_pytorch() {
     let cases: Vec<serde_json::Value> = serde_json::from_str(GOLDEN).expect("golden.json parses");
-    assert!(cases.len() >= 236, "suspiciously few golden cases");
+    assert!(cases.len() >= 240, "suspiciously few golden cases");
 
     let mut failures = Vec::new();
     for case in &cases {
@@ -35,6 +35,9 @@ fn run_case(case: &serde_json::Value) -> Result<(), String> {
     }
     if case.get("nn_linear_forward").is_some() {
         return run_nn_linear_case(case);
+    }
+    if case.get("optim_step").is_some() {
+        return run_optim_case(case);
     }
     let mut registry = Registry::new();
     let op = case["op"].as_str().expect("op");
@@ -338,6 +341,110 @@ fn run_nn_linear_case(case: &serde_json::Value) -> Result<(), String> {
             return Err(format!(
                 "bias grad: expected {}, got {actual}",
                 case["expect_bias_grad"]
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Optimizer golden (issue 0009 exp 4): explicit-weight linear, mse loss,
+/// 3 steps of torch.optim's trajectory, weights compared after each.
+fn run_optim_case(case: &serde_json::Value) -> Result<(), String> {
+    use nutorchd::lifecycle::Lifecycle;
+    use std::path::PathBuf;
+    use std::sync::Mutex;
+
+    let mut registry = Registry::new();
+    let lifecycle = Mutex::new(Lifecycle::new(None));
+    let socket = PathBuf::from("/tmp/golden.sock");
+    let bespoke = |registry: &mut Registry,
+                   request: serde_json::Value|
+     -> Result<serde_json::Value, String> {
+        let parsed = dispatch::parse_request(&request.to_string())
+            .map_err(|response| format!("parse: {response:?}"))?;
+        let (response, _) = dispatch::handle_request(registry, &lifecycle, &socket, parsed);
+        match response {
+            nutorchd::protocol::Response::Handle { handle, .. } => {
+                Ok(serde_json::Value::String(handle))
+            }
+            nutorchd::protocol::Response::Handles { handles, .. } => Ok(serde_json::json!(handles)),
+            nutorchd::protocol::Response::Value { value, .. } => Ok(value),
+            other => Err(format!("bespoke: unexpected {other:?}")),
+        }
+    };
+    let table =
+        |registry: &mut Registry, op: &str, handles: &[String]| -> Result<Vec<String>, String> {
+            let spec = nutorch_ops::find(op).ok_or_else(|| format!("{op} not in table"))?;
+            match dispatch::execute_table(registry, spec, handles, &serde_json::Map::new()) {
+                nutorchd::protocol::Response::Handles { handles, .. } => Ok(handles),
+                nutorchd::protocol::Response::Value { .. } => Ok(Vec::new()),
+                other => Err(format!("{op}: unexpected {other:?}")),
+            }
+        };
+    let make = |registry: &mut Registry, data: &serde_json::Value| -> Result<String, String> {
+        let t = convert::json_to_tensor(data, tch::Kind::Float, Device::Mps)
+            .map_err(|e| format!("input: {e}"))?;
+        Ok(registry.insert_tensor(t))
+    };
+
+    let w0 = make(&mut registry, &case["weight0"])?;
+    let x = make(&mut registry, &case["input"])?;
+    let target = make(&mut registry, &case["target"])?;
+    let out_features = case["weight0"].as_array().unwrap().len() as i64;
+    let in_features = case["weight0"][0].as_array().unwrap().len() as i64;
+    let linear = bespoke(
+        &mut registry,
+        serde_json::json!({"op":"nn","kind":"linear","args":{
+            "in_features": in_features, "out_features": out_features,
+            "weight": w0, "no_bias": true,
+        }}),
+    )?;
+    let linear = linear.as_str().unwrap().to_string();
+
+    // Optimizer over the module, hyperparams from the case.
+    let kind = case["optim_step"].as_str().unwrap();
+    let mut args = case["hyper"].clone();
+    args["module"] = serde_json::json!(linear);
+    let opt = bespoke(
+        &mut registry,
+        serde_json::json!({"op":"nn","kind": kind, "args": args}),
+    )?;
+    let opt = opt.as_str().unwrap().to_string();
+
+    let expected_steps = case["expect_steps"].as_array().unwrap();
+    for (step_index, expected) in expected_steps.iter().enumerate() {
+        bespoke(
+            &mut registry,
+            serde_json::json!({"op":"nn_zero_grad","handle": opt}),
+        )?;
+        let pred = bespoke(
+            &mut registry,
+            serde_json::json!({"op":"forward","module": linear, "tensor": x}),
+        )?;
+        let pred = pred.as_str().unwrap().to_string();
+        let loss = table(&mut registry, "mse_loss", &[pred, target.clone()])?[0].clone();
+        table(&mut registry, "backward", &[loss])?;
+        bespoke(
+            &mut registry,
+            serde_json::json!({"op":"step","optimizer": opt}),
+        )?;
+
+        // Read the module's weight via parameters (live view).
+        let params = bespoke(
+            &mut registry,
+            serde_json::json!({"op":"nn_parameters","module": linear}),
+        )?;
+        let params: Vec<String> = serde_json::from_value(params).map_err(|e| e.to_string())?;
+        let cpu = registry
+            .get_tensor(&params[0])
+            .map_err(|l| l.message())?
+            .f_to_device(Device::Cpu)
+            .map_err(|e| format!("cpu: {e}"))?;
+        let actual = convert::tensor_to_json(&cpu).map_err(|e| format!("json: {e}"))?;
+        if &actual != expected {
+            return Err(format!(
+                "step {}: expected {expected}, got {actual}",
+                step_index + 1
             ));
         }
     }

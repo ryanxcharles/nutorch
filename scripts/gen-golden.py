@@ -604,7 +604,48 @@ cases.append({
     "expect_grad": x.grad.cpu().tolist(),
 })
 
+# --- optimizer goldens (issue 0009 exp 4): 3-step trajectories vs
+# torch.optim on MPS. Explicit weights, fixed data; weights recorded after
+# EACH step (state buffers exercised). Includes coupled-weight-decay Adam —
+# the one case that distinguishes lerp_ from the textbook first-moment form.
+def optim_case(name, kind, hyper):
+    W0 = [[0.5, -0.25], [1.5, 2.0]]
+    X = [[1.0, 2.0], [0.5, -1.0]]
+    T = [[1.0, 0.0], [0.0, 1.0]]
+    w = torch.tensor(W0, dtype=torch.float32, device=DEV).requires_grad_(True)
+    x = torch.tensor(X, dtype=torch.float32, device=DEV)
+    tgt = torch.tensor(T, dtype=torch.float32, device=DEV)
+    opt_cls = {"sgd": torch.optim.SGD, "adam": torch.optim.Adam,
+               "adamw": torch.optim.AdamW, "rmsprop": torch.optim.RMSprop}[kind]
+    opt = opt_cls([w], **hyper)
+    steps = []
+    for _ in range(3):
+        opt.zero_grad()
+        loss = torch.nn.functional.mse_loss(
+            torch.nn.functional.linear(x, w), tgt)
+        loss.backward()
+        opt.step()
+        steps.append(w.detach().cpu().tolist())
+    cases.append({
+        "name": name,
+        "optim_step": kind,
+        "hyper": hyper,
+        "weight0": W0,
+        "input": X,
+        "target": T,
+        "expect_steps": steps,
+    })
+
+optim_case("opt_sgd_momentum", "sgd", {"lr": 0.1, "momentum": 0.9})
+optim_case("opt_sgd_nesterov", "sgd",
+           {"lr": 0.05, "momentum": 0.9, "nesterov": True, "weight_decay": 0.01})
+optim_case("opt_adam_coupled_wd", "adam",
+           {"lr": 0.01, "weight_decay": 0.1})
+optim_case("opt_adamw", "adamw", {"lr": 0.01, "weight_decay": 0.01})
+optim_case("opt_rmsprop", "rmsprop", {"lr": 0.01, "momentum": 0.5})
+
 out = pathlib.Path(__file__).resolve().parent.parent / "nutorchd" / "tests" / "golden.json"
+
 
 
 

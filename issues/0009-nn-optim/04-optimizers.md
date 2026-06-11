@@ -161,3 +161,64 @@ zeros); the acceptance scripts now require private sockets + seeding; `step`
 keeps the dual input pattern. Confirmed sound: the shallow-clone aliasing (steps
 propagate through sequential consumption; freed-module weights stay alive —
 PyTorch-faithful), registry hygiene, kind-string routing, floor arithmetic.
+
+## Result
+
+**Result:** Pass
+
+The issue's reason to exist, demonstrated: plain shell scripts train neural
+networks on the GPU, and the optimizer math is bitwise PyTorch's.
+
+- **Goldens: 5/5 optimizer trajectories first-run bitwise** (242 total, floor
+  240; byte-stable at sha256 `89cb0fa6…`, verified twice): SGD+momentum,
+  SGD+nesterov+weight-decay, **coupled-weight-decay Adam** (the case that pins
+  `lerp_` — the design review's empirical find, vindicated: the prescribed op
+  sequence reproduced torch.optim exactly), AdamW, RMSprop+momentum — three
+  steps each, weights compared after every step.
+- **The acceptance, executed**:
+  - `train-regression.sh`: loss 6.0012 → 2.46e-7 over 200 SGD steps; learned
+    weight 1.9996 (target 2), bias 1.0008 (target 1) — within 0.1%, far inside
+    the 5% gate. **PASS.**
+  - `train-classify.sh`: linear(2,8)→relu→linear(8,2) + Adam + cross_entropy;
+    loss 0.7069 → 0.000145; predictions exactly `[0,0,1,1,0,1]` — 100%.
+    **PASS.**
+  - Both scripts use private sockets and seeded init (reproducible gates), and
+    both are committed as the issue's demo artifacts.
+- **Unit tests** (72 daemon tests): the hand-checked SGD step (w: 1 → 0.8 at lr
+  0.1, grad 2 — with an f32-tolerance lesson: 1 − 0.1·2 is 0.800000012 in
+  float32, asserted approximately); momentum buffer evolution matching hand
+  arithmetic (0.8 → 0.54) including the FIRST-step buffer=grad-clone gotcha;
+  `set_lr` observably changing step size; step-without-grad as a silent no-op;
+  zero-parameter modules and the nesterov constraint rejected at construction;
+  `nn zero_grad` on BOTH handle kinds.
+- **Hygiene**: build 0 warnings; fmt clean; full suite green; `v1/` untouched.
+  One harness iteration: the optim case's bespoke helper initially lacked a
+  `Handles` arm (nn_parameters returns one) — caught by the first golden run,
+  fixed.
+
+## Conclusion
+
+The object model completes its arc: modules hold parameters, optimizers hold
+state over shallow-clone views, and the canonical PyTorch loop runs verbatim in
+zsh against the MPS GPU with bitwise-faithful updates. The design review's
+empirical `lerp_` finding was the experiment's hinge — without it, a textbook
+Adam would have shipped 1 ULP wrong under coupled weight decay and the goldens
+would have caught it only AFTER implementation. What remains for the issue: the
+module sweep (conv, norms, dropout, embedding, pooling) and save/load, then
+close.
+
+## Result Review
+
+**Reviewer:** `adversarial-reviewer` subagent (fresh context, read-only),
+reviewing the pre-commit working tree. **Verdict: APPROVED — one Optional
+finding, folded in** (`set_lr` rejected `lr = 0`, which PyTorch permits —
+verified against the live torch; now `lr >= 0`). The reviewer verified every
+design-review mandate in code (the `f_lerp_` first moment; the coupled-wd Adam
+golden present and passing; the nesterov constraint; the first-step buffer
+clone; private sockets + seeding in both scripts; step's stdin form live),
+reproduced byte-stable goldens at the recorded sha, spot-checked
+`opt_sgd_momentum` step-1 weights against fresh `torch.optim.SGD` on MPS
+(exact), **ran both acceptance scripts to PASS with values matching the
+Result**, ran all 72 unit tests, confirmed the quiet loop verbs don't swallow
+errors, and judged the Result honest including the f32-tolerance note and the
+harness-iteration disclosure.

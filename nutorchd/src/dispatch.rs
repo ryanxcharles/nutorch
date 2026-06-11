@@ -32,8 +32,8 @@ pub fn parse_request(line: &str) -> Result<Request, Response> {
         .ok_or_else(|| Response::error("bad_request", "request has no op"))?
         .to_string();
     match name.as_str() {
-        "tensor" | "value" | "free" | "tensors" | "nn" | "forward" | "nn_parameters"
-        | "nn_info" | "status" | "set_ttl" | "shutdown" => {
+        "tensor" | "value" | "free" | "tensors" | "nn" | "forward" | "nn_parameters" | "step"
+        | "nn_zero_grad" | "nn_set_lr" | "nn_info" | "status" | "set_ttl" | "shutdown" => {
             let bespoke: Bespoke = serde_json::from_value(raw)
                 .map_err(|e| Response::error("bad_request", format!("bad request: {e}")))?;
             Ok(Request::Bespoke(bespoke))
@@ -205,9 +205,19 @@ pub fn handle_request(
             Bespoke::Nn { kind, args } => {
                 lifecycle.lock().unwrap().touch();
                 let args = args.unwrap_or_default();
-                match build_module(registry, &kind, &args) {
-                    Ok(module) => (Response::handle(registry.insert_module(module)), false),
-                    Err((code, message)) => (Response::error(code, message), false),
+                if matches!(kind.as_str(), "sgd" | "adam" | "adamw" | "rmsprop") {
+                    match build_optimizer(registry, &kind, &args) {
+                        Ok(optimizer) => (
+                            Response::handle(registry.insert_optimizer(optimizer)),
+                            false,
+                        ),
+                        Err((code, message)) => (Response::error(code, message), false),
+                    }
+                } else {
+                    match build_module(registry, &kind, &args) {
+                        Ok(module) => (Response::handle(registry.insert_module(module)), false),
+                        Err((code, message)) => (Response::error(code, message), false),
+                    }
                 }
             }
             Bespoke::Forward { module, tensor } => {
@@ -265,6 +275,70 @@ pub fn handle_request(
                         )),
                         false,
                     ),
+                    Err(lookup) => (Response::error(lookup.code(), lookup.message()), false),
+                }
+            }
+            Bespoke::Step { optimizer } => {
+                lifecycle.lock().unwrap().touch();
+                match registry.get_optimizer_mut(&optimizer) {
+                    Ok(opt) => {
+                        // In-place mutation of grad-requiring leaves is
+                        // illegal outside no_grad.
+                        let result = tch::no_grad(|| opt.step());
+                        match result {
+                            Ok(()) => (Response::value(serde_json::json!("stepped")), false),
+                            Err(message) => (Response::error("torch_error", message), false),
+                        }
+                    }
+                    Err(lookup) => (Response::error(lookup.code(), lookup.message()), false),
+                }
+            }
+            Bespoke::NnZeroGrad { handle } => {
+                lifecycle.lock().unwrap().touch();
+                registry.touch(&handle);
+                // Both kinds are natural here: an optimizer zeroes its
+                // captured params; a module zeroes its own.
+                let result = if handle.starts_with("optim://") {
+                    registry
+                        .get_optimizer_mut(&handle)
+                        .map_err(|l| (l.code(), l.message()))
+                        .and_then(|opt| opt.zero_grad().map_err(|m| ("torch_error", m)))
+                } else {
+                    registry
+                        .get_module(&handle)
+                        .map_err(|l| (l.code(), l.message()))
+                        .and_then(|m| {
+                            let params: Vec<Tensor> = m
+                                .parameters()
+                                .into_iter()
+                                .map(|t| t.shallow_clone())
+                                .collect();
+                            crate::nn::zero_grads(&params).map_err(|m| ("torch_error", m))
+                        })
+                };
+                match result {
+                    Ok(()) => (Response::value(serde_json::json!("zeroed")), false),
+                    Err((code, message)) => (Response::error(code, message), false),
+                }
+            }
+            Bespoke::NnSetLr { optimizer, lr } => {
+                lifecycle.lock().unwrap().touch();
+                match registry.get_optimizer_mut(&optimizer) {
+                    Ok(opt) => {
+                        // PyTorch permits lr = 0 (a deliberate freeze);
+                        // only negative/non-finite is rejected.
+                        if !(lr.is_finite() && lr >= 0.0) {
+                            return (
+                                Response::error(
+                                    "bad_argument",
+                                    format!("set_lr: lr must be a non-negative number, got {lr}"),
+                                ),
+                                false,
+                            );
+                        }
+                        opt.lr = lr;
+                        (Response::value(serde_json::json!({ "lr": lr })), false)
+                    }
                     Err(lookup) => (Response::error(lookup.code(), lookup.message()), false),
                 }
             }
@@ -545,6 +619,86 @@ fn build_module(
             ),
         )),
     }
+}
+
+/// Construct an optimizer over a module's parameters (issue 0009 exp 4).
+fn build_optimizer(
+    registry: &mut Registry,
+    kind: &str,
+    args: &serde_json::Map<String, serde_json::Value>,
+) -> Result<crate::nn::Optimizer, (&'static str, String)> {
+    use crate::nn::{OptimKind, Optimizer};
+    let float_arg = |name: &str, default: f64| -> f64 {
+        args.get(name).and_then(|v| v.as_f64()).unwrap_or(default)
+    };
+    let bool_arg =
+        |name: &str| -> bool { args.get(name).and_then(|v| v.as_bool()).unwrap_or(false) };
+    let module_handle = args
+        .get("module")
+        .and_then(|v| v.as_str())
+        .ok_or(("bad_argument", format!("nn {kind}: missing module handle")))?;
+    let module = registry
+        .get_module(module_handle)
+        .map_err(|l| (l.code(), l.message()))?;
+    let params: Vec<Tensor> = module
+        .parameters()
+        .into_iter()
+        .map(|t| t.shallow_clone())
+        .collect();
+    if params.is_empty() {
+        return Err((
+            "bad_argument",
+            format!("nn {kind}: module has no parameters to optimize"),
+        ));
+    }
+    let weight_decay = float_arg("weight_decay", if kind == "adamw" { 0.01 } else { 0.0 });
+    let (optim_kind, default_lr) = match kind {
+        "sgd" => {
+            let momentum = float_arg("momentum", 0.0);
+            let dampening = float_arg("dampening", 0.0);
+            let nesterov = bool_arg("nesterov");
+            if nesterov && (momentum <= 0.0 || dampening != 0.0) {
+                return Err((
+                    "bad_argument",
+                    "nn sgd: nesterov requires momentum > 0 and dampening == 0".to_string(),
+                ));
+            }
+            let lr = args
+                .get("lr")
+                .and_then(|v| v.as_f64())
+                .ok_or(("bad_argument", "nn sgd: --lr is required".to_string()))?;
+            return Ok(Optimizer::new(
+                OptimKind::Sgd {
+                    momentum,
+                    dampening,
+                    nesterov,
+                },
+                lr,
+                weight_decay,
+                params,
+            ));
+        }
+        "adam" | "adamw" => (
+            OptimKind::Adam {
+                beta1: float_arg("beta1", 0.9),
+                beta2: float_arg("beta2", 0.999),
+                eps: float_arg("eps", 1e-8),
+                decoupled: kind == "adamw",
+            },
+            0.001,
+        ),
+        "rmsprop" => (
+            OptimKind::RmsProp {
+                alpha: float_arg("alpha", 0.99),
+                eps: float_arg("eps", 1e-8),
+                momentum: float_arg("momentum", 0.0),
+            },
+            0.01,
+        ),
+        other => return Err(("bad_argument", format!("unknown optimizer kind: {other}"))),
+    };
+    let lr = float_arg("lr", default_lr);
+    Ok(Optimizer::new(optim_kind, lr, weight_decay, params))
 }
 
 /// PyTorch nn.Linear default init: U(-1/sqrt(in), 1/sqrt(in)) for both
@@ -2732,5 +2886,193 @@ mod loss_semantics {
             }
             other => panic!("expected error, got {other:?}"),
         }
+    }
+}
+
+#[cfg(test)]
+mod optimizer_semantics {
+    use super::*;
+    use crate::lifecycle::Lifecycle;
+    use serde_json::json;
+    use std::path::PathBuf;
+    use std::sync::Mutex;
+
+    fn bespoke(registry: &mut Registry, request: serde_json::Value) -> Response {
+        let parsed = parse_request(&request.to_string()).expect("parses");
+        let lifecycle = Mutex::new(Lifecycle::new(None));
+        let socket = PathBuf::from("/tmp/test.sock");
+        handle_request(registry, &lifecycle, &socket, parsed).0
+    }
+
+    fn handle_of(response: Response) -> String {
+        match response {
+            Response::Handle { handle, .. } => handle,
+            other => panic!("expected handle, got {other:?}"),
+        }
+    }
+
+    fn weight_of(registry: &Registry, module: &str) -> serde_json::Value {
+        let m = registry.get_module(module).unwrap();
+        let cpu = m.parameters()[0].f_to_device(Device::Cpu).unwrap();
+        convert::tensor_to_json(&cpu).unwrap()
+    }
+
+    /// linear(1,1) no bias, weight [[w]]; loss = (w*1 - 0)^2 → dL/dw = 2w.
+    fn setup(registry: &mut Registry, w: f64) -> (String, String, String) {
+        let wt = convert::json_to_tensor(&json!([[w]]), Kind::Float, Device::Mps).unwrap();
+        let wh = registry.insert_tensor(wt);
+        let module = handle_of(bespoke(
+            registry,
+            json!({"op":"nn","kind":"linear","args":{
+                "in_features":1,"out_features":1,"weight": wh,"no_bias":true}}),
+        ));
+        let x = registry.insert_tensor(
+            convert::json_to_tensor(&json!([[1.0]]), Kind::Float, Device::Mps).unwrap(),
+        );
+        let target = registry.insert_tensor(
+            convert::json_to_tensor(&json!([[0.0]]), Kind::Float, Device::Mps).unwrap(),
+        );
+        (module, x, target)
+    }
+
+    fn train_step(registry: &mut Registry, module: &str, x: &str, target: &str, opt: &str) {
+        let pred = handle_of(bespoke(
+            registry,
+            json!({"op":"forward","module": module, "tensor": x}),
+        ));
+        let spec = nutorch_ops::find("mse_loss").unwrap();
+        let loss = match execute_table(
+            registry,
+            spec,
+            &[pred, target.to_string()],
+            &serde_json::Map::new(),
+        ) {
+            Response::Handles { handles, .. } => handles[0].clone(),
+            other => panic!("{other:?}"),
+        };
+        let spec = nutorch_ops::find("backward").unwrap();
+        let _ = execute_table(registry, spec, &[loss], &serde_json::Map::new());
+        assert!(matches!(
+            bespoke(registry, json!({"op":"step","optimizer": opt})),
+            Response::Value { .. }
+        ));
+        let _ = bespoke(registry, json!({"op":"nn_zero_grad","handle": opt}));
+    }
+
+    #[test]
+    fn hand_checked_sgd_step() {
+        // w=1, x=1, target=0: loss=w², grad=2w=2; lr 0.1 → w' = 1 - 0.2 = 0.8.
+        let mut registry = Registry::new();
+        let (module, x, target) = setup(&mut registry, 1.0);
+        let opt = handle_of(bespoke(
+            &mut registry,
+            json!({"op":"nn","kind":"sgd","args":{"module": module, "lr": 0.1}}),
+        ));
+        train_step(&mut registry, &module, &x, &target, &opt);
+        let w = weight_of(&registry, &module)[0][0].as_f64().unwrap();
+        assert!((w - 0.8).abs() < 1e-6, "got {w}"); // f32 arithmetic
+    }
+
+    #[test]
+    fn momentum_buffer_evolves_and_set_lr_changes_step_size() {
+        let mut registry = Registry::new();
+        let (module, x, target) = setup(&mut registry, 1.0);
+        let opt = handle_of(bespoke(
+            &mut registry,
+            json!({"op":"nn","kind":"sgd","args":{"module": module, "lr": 0.1, "momentum": 0.5}}),
+        ));
+        // Step 1: grad 2, buf = grad = 2 (FIRST-step clone), w = 1 - 0.2 = 0.8.
+        train_step(&mut registry, &module, &x, &target, &opt);
+        let w = weight_of(&registry, &module)[0][0].as_f64().unwrap();
+        assert!((w - 0.8).abs() < 1e-6, "got {w}");
+        // Step 2: grad = 1.6, buf = 0.5*2 + 1.6 = 2.6, w = 0.8 - 0.26 = 0.54.
+        train_step(&mut registry, &module, &x, &target, &opt);
+        let w = weight_of(&registry, &module);
+        let value = w[0][0].as_f64().unwrap();
+        assert!((value - 0.54).abs() < 1e-6, "got {value}");
+        // set_lr to 0 → next step moves nothing.
+        let _ = bespoke(
+            &mut registry,
+            json!({"op":"nn_set_lr","optimizer": opt, "lr": 1e-12}),
+        );
+        train_step(&mut registry, &module, &x, &target, &opt);
+        let w2 = weight_of(&registry, &module);
+        assert!((w2[0][0].as_f64().unwrap() - value).abs() < 1e-6);
+    }
+
+    #[test]
+    fn step_skips_params_without_grad_and_rejects_empty_modules() {
+        let mut registry = Registry::new();
+        let (module, _, _) = setup(&mut registry, 1.0);
+        let opt = handle_of(bespoke(
+            &mut registry,
+            json!({"op":"nn","kind":"sgd","args":{"module": module, "lr": 0.1}}),
+        ));
+        // No backward has run: step is a no-op, not an error.
+        assert!(matches!(
+            bespoke(&mut registry, json!({"op":"step","optimizer": opt})),
+            Response::Value { .. }
+        ));
+        assert_eq!(weight_of(&registry, &module), json!([[1.0]]));
+        // Zero-parameter module rejected at construction.
+        let relu = handle_of(bespoke(
+            &mut registry,
+            json!({"op":"nn","kind":"relu","args":{}}),
+        ));
+        match bespoke(
+            &mut registry,
+            json!({"op":"nn","kind":"sgd","args":{"module": relu, "lr": 0.1}}),
+        ) {
+            Response::Error { code, error, .. } => {
+                assert_eq!(code, "bad_argument");
+                assert!(error.contains("no parameters"));
+            }
+            other => panic!("expected error, got {other:?}"),
+        }
+        // Nesterov constraint.
+        let (module2, _, _) = setup(&mut registry, 1.0);
+        match bespoke(
+            &mut registry,
+            json!({"op":"nn","kind":"sgd","args":{"module": module2, "lr": 0.1, "nesterov": true}}),
+        ) {
+            Response::Error { code, error, .. } => {
+                assert_eq!(code, "bad_argument");
+                assert!(error.contains("nesterov requires"));
+            }
+            other => panic!("expected error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn zero_grad_works_on_both_handle_kinds() {
+        let mut registry = Registry::new();
+        let (module, x, target) = setup(&mut registry, 1.0);
+        let opt = handle_of(bespoke(
+            &mut registry,
+            json!({"op":"nn","kind":"sgd","args":{"module": module, "lr": 0.1}}),
+        ));
+        train_step(&mut registry, &module, &x, &target, &opt); // leaves zeroed grads
+                                                               // Re-backward then zero via the MODULE handle this time.
+        let pred = handle_of(bespoke(
+            &mut registry,
+            json!({"op":"forward","module": module, "tensor": x}),
+        ));
+        let spec = nutorch_ops::find("sum").unwrap();
+        let loss = match execute_table(&mut registry, spec, &[pred], &serde_json::Map::new()) {
+            Response::Handles { handles, .. } => handles[0].clone(),
+            other => panic!("{other:?}"),
+        };
+        let spec = nutorch_ops::find("backward").unwrap();
+        let _ = execute_table(&mut registry, spec, &[loss], &serde_json::Map::new());
+        assert!(matches!(
+            bespoke(&mut registry, json!({"op":"nn_zero_grad","handle": module})),
+            Response::Value { .. }
+        ));
+        // The module's param grad is now zeros.
+        let m = registry.get_module(&module).unwrap();
+        let grad = m.parameters()[0].f_grad().unwrap();
+        assert!(grad.defined());
+        let cpu = grad.f_detach().unwrap().f_to_device(Device::Cpu).unwrap();
+        assert_eq!(convert::tensor_to_json(&cpu).unwrap(), json!([[0.0]]));
     }
 }
