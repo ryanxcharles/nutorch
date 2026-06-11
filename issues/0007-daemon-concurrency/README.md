@@ -87,3 +87,8 @@ everything proceeds; the idle connection eventually costs only its own thread.
 Plus: parallel-client stress (N shells looping ops against one daemon, all
 results exact), shutdown-under-load behaving per the decided semantics, and the
 full existing suite (unit, golden, lifecycle) green unchanged.
+
+## Experiments
+
+- [Experiment 1: Thread-per-connection, one lock as the execution queue](01-thread-per-connection.md)
+  — **Designed**
