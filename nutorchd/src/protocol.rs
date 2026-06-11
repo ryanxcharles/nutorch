@@ -27,6 +27,8 @@ pub enum Bespoke {
         handles: Option<Vec<String>>,
         all: Option<bool>,
     },
+    /// List every tensor the registry holds (issue 0006).
+    Tensors,
     Status,
     #[serde(rename = "set_ttl")]
     SetTtl {

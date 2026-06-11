@@ -112,4 +112,5 @@ formats for very large tensors.
   **Pass** (atomic free by arg/stdin/--all; the rm convention; registry
   accounting verified to the byte; op table untouched)
 - [Experiment 2: `torch tensors` — the listing that makes `free` targetable](02-torch-tensors.md)
-  — **Designed**
+  — **Pass** (oldest-first census with per-tensor age/idle; bool dtype listed
+  correctly; the awk→free composition works; no spawn, no lease touch)

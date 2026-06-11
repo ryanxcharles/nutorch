@@ -126,3 +126,53 @@ silent exit-0 trade is defensible as documented, the touch/borrow ordering is
 sound, `free`'s remove-discard is Entry-compatible, no table op named `tensors`
 exists, and Response::Value carries the array shape. Approved with the fixes in
 place (the reviewer's prescriptions verbatim).
+
+## Result
+
+**Result:** Pass
+
+The registry has its census. All four verification gates green:
+
+- **Unit tests** (42 daemon tests total, up from 38): list order + field
+  correctness incl. a Bool row (`eq` result listed as dtype `bool`, 1
+  byte/element); `touch` resets idle while `get` does not; ops reset their
+  operand's idle but not a bystander's; the listing touches neither tensor idle
+  nor the daemon lease.
+- **Live**: no daemon → silent, exit 0, **and no socket appears** (no spawn);
+  rows list oldest-first with compact shapes (`[2,2]`), correct dtypes
+  (`float32`/`int64`/`bool`) and byte counts; after `sleep 2; torch
+  sin $a`
+  the operand's idle reads 0s while bystanders read 2s; the daemon lease is
+  unmoved by a listing (2s before and after); **the promised composition
+  works**: `torch tensors | awk '{print $1}' | torch free` → `tensors: 0`; the
+  wire shape verified via `nc`.
+- **Hygiene**: build 0 warnings; fmt clean; 207 goldens untouched and green;
+  `v1/` untouched.
+- **One honest cosmetic note**: the handle/shape/dtype columns are
+  width-aligned; the bytes column is single-space separated only (awk parsing —
+  the load-bearing property — is unaffected).
+
+## Conclusion
+
+`free` + `tensors` together close the issue's lifecycle strand: you can now see
+what the registry holds and reclaim any of it, from a pipeline, selectively or
+wholesale. The per-tensor `created`/`touched` timestamps cost one Entry struct
+and an explicit touch pass — `get` stays pure, so "what counts as use" remains a
+dispatch-level decision. Next: the round-trip strand (bool input path,
+non-finite policy, the `--meta` envelope), and the relief-valve documentation
+rides with it.
+
+## Result Review
+
+**Reviewer:** `adversarial-reviewer` subagent (fresh context, read-only),
+reviewing the pre-commit working tree. **Verdict: APPROVED — no Required,
+Optional, or Nit findings.** The reviewer reproduced everything: all three
+design-review mandates confirmed in code AND live (kind_name's full coverage
+with a non-panicking fallback, the bool row at 1 byte/element; the early-return
+branch with no socket appearing on a dead-daemon call; the guarded no-op touch);
+per-operand idle semantics live (operand 0s, bystander 9s); the HandleOrScalar
+touch verified with `clamp --min
+$BOUNDS` resetting the bound tensor's idle; the
+lease unmoved by a listing; oldest-first ordering; the wire shape via nc; the
+awk→free composition emptying a 7-tensor registry; and the Result's cosmetic
+bytes-column note checked against real output and found honest.

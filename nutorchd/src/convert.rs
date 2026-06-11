@@ -17,6 +17,25 @@ pub fn tch_error(e: tch::TchError) -> String {
 
 /// v1 fidelity: default dtype is float32 (v1/cargo/src/lib.rs:197), not
 /// Python torch.tensor's int64 inference.
+/// Display name for a Kind, covering every kind the registry can hold —
+/// comparison ops mint Bool, `randn --dtype float16` mints Half. Where a
+/// name overlaps `parse_kind`'s inputs it matches them; the rest are
+/// display-only.
+pub fn kind_name(kind: tch::Kind) -> String {
+    match kind {
+        tch::Kind::Float => "float32".to_string(),
+        tch::Kind::Double => "float64".to_string(),
+        tch::Kind::Half => "float16".to_string(),
+        tch::Kind::Int => "int32".to_string(),
+        tch::Kind::Int64 => "int64".to_string(),
+        tch::Kind::Int16 => "int16".to_string(),
+        tch::Kind::Int8 => "int8".to_string(),
+        tch::Kind::Uint8 => "uint8".to_string(),
+        tch::Kind::Bool => "bool".to_string(),
+        other => format!("{other:?}").to_lowercase(),
+    }
+}
+
 pub fn parse_kind(dtype: Option<&str>) -> Result<Kind, String> {
     match dtype {
         None | Some("float32") | Some("float") => Ok(Kind::Float),

@@ -446,6 +446,52 @@ fn build_bespoke_request(args: &RawArgs) -> Result<serde_json::Value, String> {
     }
 }
 
+/// `torch tensors`: list the registry, oldest first. Never spawns the
+/// daemon — a dead daemon truthfully holds no tensors, so daemon-down
+/// prints nothing and exits 0 (`torch tensors | torch free` no-ops).
+fn run_tensors(args: &RawArgs, socket: &PathBuf) -> Result<(), String> {
+    if !args.positionals.is_empty() || !args.flags.is_empty() {
+        return Err("usage: torch tensors".to_string());
+    }
+    if !daemon_alive(socket) {
+        return Ok(());
+    }
+    let response = exchange(socket, &serde_json::json!({"op":"tensors"}))?;
+    let rows = match response["value"].as_array() {
+        Some(rows) => rows.clone(),
+        None => return Err("tensors: malformed response".to_string()),
+    };
+    // Column widths for eyes; single-space minimum for awk.
+    let shapes: Vec<String> = rows
+        .iter()
+        .map(|r| {
+            let dims: Vec<String> = r["shape"]
+                .as_array()
+                .map(|a| a.iter().map(|d| d.to_string()).collect())
+                .unwrap_or_default();
+            format!("[{}]", dims.join(","))
+        })
+        .collect();
+    let shape_w = shapes.iter().map(|s| s.len()).max().unwrap_or(0);
+    let dtype_w = rows
+        .iter()
+        .filter_map(|r| r["dtype"].as_str().map(str::len))
+        .max()
+        .unwrap_or(0);
+    for (row, shape) in rows.iter().zip(&shapes) {
+        println!(
+            "{}  {:<shape_w$}  {:<dtype_w$}  {}  {}s  {}s",
+            row["handle"].as_str().unwrap_or("?"),
+            shape,
+            row["dtype"].as_str().unwrap_or("?"),
+            row["bytes"],
+            row["age_secs"],
+            row["idle_secs"],
+        );
+    }
+    Ok(())
+}
+
 // ---------- daemon verbs ----------
 
 fn daemon_pid(socket: &PathBuf) -> Result<u64, String> {
@@ -612,6 +658,10 @@ fn run() -> Result<(), String> {
 
     if args.op == "daemon" {
         return run_daemon_verb(&args, &socket);
+    }
+
+    if args.op == "tensors" {
+        return run_tensors(&args, &socket);
     }
 
     let request = match spec {

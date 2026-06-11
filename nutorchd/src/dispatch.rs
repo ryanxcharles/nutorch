@@ -32,7 +32,7 @@ pub fn parse_request(line: &str) -> Result<Request, Response> {
         .ok_or_else(|| Response::error("bad_request", "request has no op"))?
         .to_string();
     match name.as_str() {
-        "tensor" | "value" | "free" | "status" | "set_ttl" | "shutdown" => {
+        "tensor" | "value" | "free" | "tensors" | "status" | "set_ttl" | "shutdown" => {
             let bespoke: Bespoke = serde_json::from_value(raw)
                 .map_err(|e| Response::error("bad_request", format!("bad request: {e}")))?;
             Ok(Request::Bespoke(bespoke))
@@ -110,6 +110,7 @@ pub fn handle_request(
             }
             Bespoke::Value { handle } => {
                 lifecycle.lock().unwrap().touch();
+                registry.touch(&handle);
                 match registry.get(&handle) {
                     Some(tensor) => {
                         let cpu = match tensor.f_to_device(Device::Cpu) {
@@ -174,6 +175,24 @@ pub fn handle_request(
                     Response::value(serde_json::json!({ "freed": handles.len() })),
                     false,
                 )
+            }
+            Bespoke::Tensors => {
+                // Analysis, like status: no lease touch, no tensor touch.
+                let rows: Vec<serde_json::Value> = registry
+                    .list()
+                    .into_iter()
+                    .map(|row| {
+                        serde_json::json!({
+                            "handle": row.handle,
+                            "shape": row.shape,
+                            "dtype": convert::kind_name(row.kind),
+                            "bytes": row.bytes,
+                            "age_secs": row.age_secs,
+                            "idle_secs": row.idle_secs,
+                        })
+                    })
+                    .collect();
+                (Response::value(serde_json::Value::Array(rows)), false)
             }
             Bespoke::Status => {
                 let state = lifecycle.lock().unwrap();
@@ -375,6 +394,20 @@ pub fn execute_table(
         Ok(p) => p,
         Err(response) => return response,
     };
+
+    // Touch pass (issue 0006): mark operand and param-tensor handles as
+    // used BEFORE the immutable resolution borrows begin. touch() is a
+    // no-op on absent handles, so resolution still owns the error.
+    for handle in tensor_handles {
+        registry.touch(handle);
+    }
+    for param in spec.params {
+        if param.kind == ParamKind::HandleOrScalar {
+            if let Some(serde_json::Value::String(handle)) = params.map.get(param.name) {
+                registry.touch(handle);
+            }
+        }
+    }
 
     // Handles.
     let mut tensors: Vec<&Tensor> = Vec::with_capacity(tensor_handles.len());
@@ -1566,5 +1599,86 @@ mod free_semantics {
         let _ = handle_request(&mut registry, &lifecycle, &socket, parsed);
         let idle_after = lifecycle.lock().unwrap().idle_secs();
         assert!(idle_after <= idle_before);
+    }
+}
+
+#[cfg(test)]
+mod tensors_listing_semantics {
+    use super::*;
+    use crate::lifecycle::Lifecycle;
+    use serde_json::json;
+    use std::path::PathBuf;
+    use std::sync::Mutex;
+    use std::time::Duration;
+
+    fn dispatch(
+        registry: &mut Registry,
+        lifecycle: &Mutex<Lifecycle>,
+        request: serde_json::Value,
+    ) -> Response {
+        let parsed = parse_request(&request.to_string()).expect("parses");
+        let socket = PathBuf::from("/tmp/test.sock");
+        handle_request(registry, lifecycle, &socket, parsed).0
+    }
+
+    #[test]
+    fn rows_match_registry_contents_including_bool() {
+        let mut registry = Registry::new();
+        let lifecycle = Mutex::new(Lifecycle::new(None));
+        let a = registry
+            .insert(convert::json_to_tensor(&json!([1.0, 2.0]), Kind::Float, Device::Mps).unwrap());
+        let spec = nutorch_ops::find("eq").unwrap();
+        let response = execute_table(
+            &mut registry,
+            spec,
+            &[a.clone(), a.clone()],
+            &serde_json::Map::new(),
+        );
+        assert!(matches!(response, Response::Handles { .. }));
+
+        let listing = dispatch(&mut registry, &lifecycle, json!({"op":"tensors"}));
+        let rows = match listing {
+            Response::Value { value, .. } => value.as_array().unwrap().clone(),
+            other => panic!("expected value, got {other:?}"),
+        };
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0]["handle"], a); // oldest first
+        assert_eq!(rows[0]["dtype"], "float32");
+        assert_eq!(rows[0]["bytes"], 8);
+        assert_eq!(rows[1]["dtype"], "bool"); // the eq result
+        assert_eq!(rows[1]["bytes"], 2); // 1 byte per element
+    }
+
+    #[test]
+    fn ops_reset_operand_idle_and_listing_resets_nothing() {
+        let mut registry = Registry::new();
+        let lifecycle = Mutex::new(Lifecycle::new(Some(Duration::from_secs(3600))));
+        let a = registry
+            .insert(convert::json_to_tensor(&json!([1.0]), Kind::Float, Device::Mps).unwrap());
+        let b = registry
+            .insert(convert::json_to_tensor(&json!([2.0]), Kind::Float, Device::Mps).unwrap());
+        std::thread::sleep(Duration::from_millis(1100));
+
+        // An op touches its operand...
+        let spec = nutorch_ops::find("sin").unwrap();
+        let _ = execute_table(&mut registry, spec, &[a.clone()], &serde_json::Map::new());
+        let idle_of = |registry: &Registry, handle: &str| {
+            registry
+                .list()
+                .into_iter()
+                .find(|row| row.handle == handle)
+                .unwrap()
+                .idle_secs
+        };
+        assert_eq!(idle_of(&registry, &a), 0);
+        // ...but not the bystander.
+        assert!(idle_of(&registry, &b) >= 1);
+
+        // The listing itself touches neither tensors nor the lease.
+        std::thread::sleep(Duration::from_millis(1100));
+        let lease_idle_before = lifecycle.lock().unwrap().idle_secs();
+        let _ = dispatch(&mut registry, &lifecycle, json!({"op":"tensors"}));
+        assert!(idle_of(&registry, &a) >= 1);
+        assert!(lifecycle.lock().unwrap().idle_secs() >= lease_idle_before);
     }
 }
