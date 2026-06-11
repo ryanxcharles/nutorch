@@ -111,3 +111,8 @@ structural change that makes expiry possible — settled in the experiment.
   unnecessary for now) and any auto-spawn-on-login behavior.
 - Persistence / save-load (the real long-term answer to "I left and my tensors
   died").
+
+## Experiments
+
+- [Experiment 1: Daemon-side lifecycle — idle TTL, clean exits, probe-bind, and the three protocol ops](01-daemon-side-lifecycle.md)
+  — **Designed**
