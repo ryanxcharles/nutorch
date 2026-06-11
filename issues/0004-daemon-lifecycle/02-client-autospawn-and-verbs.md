@@ -2,6 +2,16 @@
 [implementer]
 agent = "claude-code"
 model = "claude-fable-5"
+
+[review.design]
+agent = "claude-code"
+subagent = "adversarial-reviewer"
+model = "claude-opus"
+
+[review.result]
+agent = "claude-code"
+subagent = "adversarial-reviewer"
+model = "claude-opus"
 +++
 
 # Experiment 2: Client auto-spawn and the `torch daemon` command family
@@ -137,3 +147,79 @@ not respawn transparently, or a non-spawning verb spawns a daemon.
 reviewer verified the check-9 fix against both binaries' `default_socket_path()`
 implementations (private TMPDIR genuinely isolates both the spawned daemon and
 the stopping client). No new findings.
+
+## Result
+
+**Result:** Pass
+
+All ten checks pass in a single clean run:
+
+```
+cold start:        [1.0,2.0,3.0] from a dead socket; status shows the spawned
+                   daemon; the .log file exists with the banner
+status after stop: "daemon not running" on stderr, exit 1, no socket appears
+expiry → respawn:  daemon ttl 2s → 4s later a plain tensor op succeeds ([9.0])
+                   against a NEW pid — the full invisible loop
+ttl verb:          ttl 30m → 1800s; status remaining: 1799s
+restart:           new pid; the old handle is "unknown handle" (fresh registry)
+stop idempotent:   second stop → "nothing to stop", exit 0
+start idempotent:  "started (pid N)" then "already running (pid N)"
+default socket:    end-to-end under a private TMPDIR; nothing left behind
+docs:              README "The daemon" section; AGENTS.md Vision updated
+```
+
+**Hygiene:** `cargo build` 0 warnings; `cargo test` green (32);
+`cargo fmt --all -- --check` clean; `dprint check` clean;
+`git status --porcelain v1/` empty; no stray daemons after the run.
+
+**Bug found and fixed during verification (the find of the experiment):** the
+first verification run **deadlocked**. The daemon-verb code probed liveness with
+`match try_connect(socket) { Some(_) => exchange(...) }` — and a Rust `match`
+scrutinee's temporary lives for the entire match arm, so the probe connection
+stayed open while `exchange` opened a second connection. Against the serial
+one-connection-at-a-time daemon (still blocked reading the open probe), the
+reply never came: a textbook self-deadlock. The fix replaces every probe site
+with `daemon_alive()`, which drops the probe stream before returning, with a doc
+comment explaining exactly this hazard (`torch-cli/src/main.rs`). The tensor-op
+path had silently dodged the bug only because a plain `if` condition drops its
+temporary earlier. This is the serial daemon's first real bite; the concurrency
+issue inherits the case study.
+
+**Verification-run note:** after the deadlock was fixed, the first (stuck) test
+script was found still limping in the background racing the re-run on the same
+socket; everything was killed and the entire suite re-run clean, uncontended —
+the transcript above is from that clean run. A momentary `pgrep` hit after the
+final stop was confirmed to be shutdown exit-latency (the daemon flushes its
+reply before exiting), not a leak.
+
+## Conclusion
+
+The issue's goal holds end to end. From a dead machine state:
+`torch tensor '[1,2,3]' | torch value` just works — daemon spawned invisibly,
+logged beside its socket; an hour of inactivity later it is gone, and the next
+command conjures a fresh one. `torch daemon status` shows the lease in real
+time; `ttl`/`stop`/`restart`/`start` control it. Auto-start makes expiry
+harmless, expiry makes auto-start safe to forget — the two halves the issue
+called load-bearing are both real now.
+
+Carried forward: the match-scrutinee deadlock is the strongest argument yet for
+the concurrency issue (a daemon that served connections concurrently would never
+have deadlocked); the simultaneous-start TOCTOU window remains deferred there
+too.
+
+## Result Review
+
+**Reviewer:** `adversarial-reviewer` subagent (fresh context, read-only),
+reviewing the pre-commit working tree. **Verdict: APPROVED — no Required or
+Optional findings; one Nit, folded in** (the "log path with `.log`" wording now
+says the extension is _replaced_, matching `with_extension`'s behavior). The
+reviewer independently reproduced every gate and behavioral check on its own
+throwaway sockets — including the deadlock regression check (`daemon
+status`
+must reply, not hang) and the private-TMPDIR default-socket run — and audited
+the review-mandated items in code: null stdin + log redirect on the spawned
+daemon, restart's poll-until-dead, daemon verbs structurally unable to reach the
+stdin fallback, and auto-spawn reachable only from tensor ops / start / restart.
+It verified no held-probe patterns remain and judged the deadlock account
+"technically accurate — correct Rust semantics" (match scrutinee temporaries vs
+if-condition temporaries) against the daemon's serial accept loop.

@@ -58,8 +58,13 @@ Apple-silicon GPU
 - **Any shell works out of the box.** Nushell remains the premium client
   (structured data, native serialization), but bash, zsh, fish, and scripts in
   any language are first-class citizens.
-- **Tensor lifetime becomes a first-class concept** — named handles, sessions,
-  TTLs — instead of a side effect of plugin process management.
+- **The daemon lifecycle is invisible plumbing** (issue 0004): any `torch`
+  command auto-starts the daemon; it shuts itself down after a sliding idle TTL
+  (default 1 hour; every tensor op renews the lease), cleaning up its socket on
+  every exit path; `torch daemon status|ttl|stop|restart|start` makes it
+  analyzable and controllable. Tensors live exactly as long as the daemon — the
+  memory-horizon contract. Tensor-level lifecycle (named handles, `free`,
+  per-tensor TTLs) remains future work.
 
 The v2 architecture, wire protocol, lifecycle model, and client surface are
 designed through issues in `issues/` — the design record lives there, not here.
@@ -101,6 +106,7 @@ nutorch/
 │   ├── src/registry.rs          #   handle → tch::Tensor map
 │   ├── src/convert.rs           #   JSON ↔ tensor (ported from v1)
 │   ├── src/protocol.rs          #   NDJSON wire types (PoC, throwaway)
+│   ├── src/lifecycle.rs         #   sliding idle TTL (issue 0004)
 │   └── tests/mps_smoke.rs       #   toolchain/MPS proof (issue 0002 exp 1)
 ├── torch-cli/                   # Thin client; binary is named `torch`
 │   └── src/main.rs              #   args/stdin → one request → stdout

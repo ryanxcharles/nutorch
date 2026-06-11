@@ -118,4 +118,5 @@ structural change that makes expiry possible — settled in the experiment.
   — **Pass** (expiry/renewal/status/set_ttl/shutdown/signals all behave; both
   socket debts closed; 32 tests green)
 - [Experiment 2: Client auto-spawn and the `torch daemon` command family](02-client-autospawn-and-verbs.md)
-  — **Designed**
+  — **Pass** (cold start, expiry→transparent-respawn, and all five verbs behave;
+  found and fixed a match-scrutinee probe deadlock against the serial daemon)

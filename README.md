@@ -22,6 +22,24 @@ torch add $a $b | torch value
 # → [5.0,7.0,9.0]   (computed on the GPU)
 ```
 
+## The daemon
+
+You never start the daemon — any `torch` command starts it automatically if it
+isn't running. It shuts itself down after **1 hour of inactivity** (every tensor
+operation renews the lease), so your tensors last long enough to be useful
+without holding GPU memory you've stopped using. Tensors live exactly as long as
+the daemon — that's the memory-horizon contract.
+
+```bash
+torch daemon status      # pid, ttl, idle time, time remaining,
+                         # tensor count, memory held, socket, log
+torch daemon ttl 4h      # change the idle TTL on the live daemon (none = forever)
+torch daemon stop        # shut down now
+torch daemon restart     # fresh daemon, empty registry
+```
+
+The default TTL is configurable via `NUTORCHD_TTL` (e.g. `30m`, `2h`, `none`).
+
 ## Status
 
 **Proof of concept working** (issue 0002): daemon, thin client, six ops
