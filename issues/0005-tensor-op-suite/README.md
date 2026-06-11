@@ -167,4 +167,5 @@ inside it).
 ## Experiments
 
 - [Experiment 1: The op table — architecture, grammar, errors, golden tests, and 15 representative ops](01-op-table-architecture.md)
-  — **Designed**
+  — **Pass** (the loom works: 29/29 goldens vs real PyTorch; found the MPS RNG
+  gap and a serde float-precision bug in the first hour)

@@ -78,14 +78,21 @@ implementation that v2 ports from. These v1 principles remain binding for v2:
 1. **String handles are the interface.** Tensor data never leaves Rust; clients
    hold and pass opaque string identifiers.
 2. **Dual Input Pattern.** Every operation supports both pipeline form
-   (`$t1 | torch add $t2`) and argument form (`torch add $t1 $t2`), with XOR
-   enforcement (reject both-or-neither). This is not optional — it is how the
-   tool feels native to both PyTorch users and shell users.
+   (`$t1 | torch add $t2`) and argument form (`torch add $t1 $t2`). This is not
+   optional — it is how the tool feels native to both PyTorch users and shell
+   users. (v1's "XOR enforcement" clause was retired by issue 0005 in favor of
+   the stdin-prefix grammar: stdin fills the leftmost missing tensor slots, one
+   handle per line, and is never read when nothing is missing — reading stdin to
+   detect a "conflict" blocks on terminals, steals input from enclosing
+   `while read` loops, and behaves differently inside pipelines.)
 3. **PyTorch API fidelity.** Command names, argument order, defaults, and
    semantics match PyTorch wherever possible.
-4. **Explicit over implicit.** No auto-casting, no automatic broadcasting
-   surprises. (v1's "manual device placement" clause was retired by issue 0003:
-   there is exactly one device — the GPU — so there is nothing to place.)
+4. **Explicit over implicit.** No silent auto-casting. (Two clauses retired:
+   "manual device placement" by issue 0003 — exactly one device, nothing to
+   place — and "no automatic broadcasting" by issue 0005: PyTorch broadcasting
+   IS the pledged semantics, and an `add` that disagrees with every PyTorch doc
+   would be the real surprise. Non-broadcastable shapes error with both shapes
+   named.)
 5. **Validate in Rust, not C++.** Pre-validate shapes, dims, and dtypes before
    tch-rs calls — LibTorch errors are opaque and crash-prone; Rust-side
    validation gives good error messages.
@@ -109,7 +116,9 @@ nutorch/
 │   ├── src/lifecycle.rs         #   sliding idle TTL (issue 0004)
 │   └── tests/mps_smoke.rs       #   toolchain/MPS proof (issue 0002 exp 1)
 ├── torch-cli/                   # Thin client; binary is named `torch`
-│   └── src/main.rs              #   args/stdin → one request → stdout
+│   └── src/main.rs              #   grammar/stdin → one request → stdout
+├── ops/                         # nutorch-ops: the declarative op table
+│   └── src/lib.rs               #   OpSpec rows read by both binaries
 ├── .cargo/config.toml           # Force-pins LIBTORCH to .libtorch (venv)
 │                                #   (.venv-torch + .libtorch symlink are
 │                                #    gitignored; see Cargo.toml header)
@@ -127,7 +136,8 @@ nutorch/
 │   └── create-skill/            # Meta-skill for authoring new skills
 │
 ├── scripts/
-│   └── build-issues-index.sh    # Regenerate issues/README.md
+│   ├── build-issues-index.sh    # Regenerate issues/README.md
+│   └── gen-golden.py            # Golden vectors from .venv-torch (MPS)
 │
 ├── .claude/
 │   ├── skills -> ../skills      # Symlink

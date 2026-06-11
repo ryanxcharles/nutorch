@@ -1,52 +1,24 @@
-//! torch: the Nutorch v2 thin client (PoC, issue 0002).
+//! torch: the Nutorch v2 thin client.
 //!
 //! One operation per invocation: build a one-line JSON request, send it to
-//! nutorchd over the Unix socket, print the result. Handles print as bare
-//! strings so they compose in POSIX pipelines; when an op needs a tensor
-//! handle and none is given positionally, one line is read from stdin (the
-//! dual input pattern's pipeline form). Deliberately has no tch dependency —
-//! the client stays thin.
+//! nutorchd over the Unix socket, print the result. Handles print one per
+//! line, so they compose in POSIX pipelines (multi-return ops emit several
+//! lines). Deliberately has no tch dependency — the client stays thin.
+//!
+//! Argument grammar (issue 0005): an op's tensor slots fill
+//! stdin-prefix/positional-suffix — with k positionals for arity n, the
+//! first (n−k) slots are read from stdin, one handle per line; if k = n,
+//! stdin is never read. Variadic ops take all stdin lines (when stdin is not
+//! a TTY) plus positionals. Positional params follow the tensor slots; the
+//! rest are flags.
 
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{BufRead, BufReader, IsTerminal, Read, Write};
 use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
 use std::process::{ExitCode, Stdio};
 use std::time::Duration;
 
-struct Args {
-    op: String,
-    positional: Vec<String>,
-    dtype: Option<String>,
-    socket: Option<String>,
-}
-
-fn parse_args() -> Result<Args, String> {
-    let mut raw = std::env::args().skip(1);
-    let op = raw.next().ok_or("usage: torch <op> [args...]")?;
-    let mut positional = Vec::new();
-    let mut dtype = None;
-    let mut socket = None;
-    while let Some(arg) = raw.next() {
-        match arg.as_str() {
-            "--dtype" => dtype = Some(raw.next().ok_or("--dtype needs a value")?),
-            "--socket" => socket = Some(raw.next().ok_or("--socket needs a value")?),
-            "--device" => {
-                return Err(
-                    "the device option was removed; tensors always live on the GPU (mps)"
-                        .to_string(),
-                )
-            }
-            flag if flag.starts_with("--") => return Err(format!("unknown flag: {flag}")),
-            _ => positional.push(arg),
-        }
-    }
-    Ok(Args {
-        op,
-        positional,
-        dtype,
-        socket,
-    })
-}
+use nutorch_ops::{Arity, OpSpec, ParamKind};
 
 fn default_socket_path() -> PathBuf {
     match std::env::var_os("TMPDIR") {
@@ -84,9 +56,7 @@ fn nutorchd_binary() -> PathBuf {
 
 /// Auto-start (issue 0004): spawn nutorchd detached — stdin null,
 /// stdout/stderr appended to the conventional log file — then poll the
-/// socket until it answers. The daemon's probe-bind makes spawn races
-/// harmless (losers exit 0), modulo the simultaneous-start window recorded
-/// in issue 0004 experiment 1.
+/// socket until it answers.
 fn ensure_daemon(socket: &Path) -> Result<(), String> {
     if daemon_alive(socket) {
         return Ok(());
@@ -118,93 +88,6 @@ fn ensure_daemon(socket: &Path) -> Result<(), String> {
         "nutorchd did not come up within 5s; see {}",
         log.display()
     ))
-}
-
-/// Positional argument if present, else one line from stdin (pipeline form).
-fn positional_or_stdin(args: &Args, index: usize, what: &str) -> Result<String, String> {
-    if let Some(value) = args.positional.get(index) {
-        return Ok(value.clone());
-    }
-    let mut line = String::new();
-    std::io::stdin()
-        .read_to_string(&mut line)
-        .map_err(|e| format!("failed to read {what} from stdin: {e}"))?;
-    let line = line.trim();
-    if line.is_empty() {
-        return Err(format!(
-            "missing {what}: pass it as an argument or pipe it in"
-        ));
-    }
-    Ok(line.to_string())
-}
-
-/// Two handles for a binary op. Two positionals → (a, b). One positional →
-/// a comes from stdin and the positional is b (pipeline form, matching v1's
-/// pipeline-is-first-operand convention). Zero positionals → error.
-fn binary_handles(args: &Args, op: &str) -> Result<(String, String), String> {
-    match args.positional.len() {
-        2 => Ok((args.positional[0].clone(), args.positional[1].clone())),
-        1 => {
-            let a = positional_or_stdin(args, 1, "left-hand tensor handle")?;
-            Ok((a, args.positional[0].clone()))
-        }
-        0 => Err(format!(
-            "{op} needs two tensor handles (two arguments, or pipe one in and pass one)"
-        )),
-        n => Err(format!("{op} takes two tensor handles, got {n} arguments")),
-    }
-}
-
-fn build_request(args: &Args) -> Result<serde_json::Value, String> {
-    match args.op.as_str() {
-        "tensor" => {
-            let data_text = positional_or_stdin(args, 0, "tensor data")?;
-            let data: serde_json::Value = serde_json::from_str(&data_text)
-                .map_err(|e| format!("tensor data is not valid JSON: {e}"))?;
-            Ok(serde_json::json!({
-                "op": "tensor",
-                "data": data,
-                "dtype": args.dtype,
-            }))
-        }
-        "full" => {
-            let shape_text = args
-                .positional
-                .first()
-                .ok_or("full needs a shape, e.g. torch full '[2,2]' 1")?;
-            let shape: serde_json::Value = serde_json::from_str(shape_text)
-                .map_err(|e| format!("shape is not valid JSON: {e}"))?;
-            let value_text = args
-                .positional
-                .get(1)
-                .ok_or("full needs a fill value, e.g. torch full '[2,2]' 1")?;
-            let value: serde_json::Value = serde_json::from_str(value_text)
-                .map_err(|e| format!("fill value is not a number: {e}"))?;
-            Ok(serde_json::json!({
-                "op": "full",
-                "shape": shape,
-                "value": value,
-                "dtype": args.dtype,
-            }))
-        }
-        "add" => {
-            let (a, b) = binary_handles(args, "add")?;
-            Ok(serde_json::json!({ "op": "add", "a": a, "b": b }))
-        }
-        "mm" => {
-            let (a, b) = binary_handles(args, "mm")?;
-            Ok(serde_json::json!({ "op": "mm", "a": a, "b": b }))
-        }
-        "mean" => {
-            let handle = positional_or_stdin(args, 0, "tensor handle")?;
-            Ok(serde_json::json!({ "op": "mean", "handle": handle }))
-        }
-        "value" => {
-            let handle = positional_or_stdin(args, 0, "tensor handle")?;
-            Ok(serde_json::json!({ "op": "value", "handle": handle }))
-        }
-        other => Err(format!("unknown op: {other}")),
-    }
 }
 
 fn round_trip(socket: &PathBuf, request: &serde_json::Value) -> Result<String, String> {
@@ -245,6 +128,279 @@ fn exchange(socket: &PathBuf, request: &serde_json::Value) -> Result<serde_json:
     }
 }
 
+/// Print a successful response: handles one per line; values as JSON.
+fn print_response(response: &serde_json::Value) {
+    if let Some(handles) = response["handles"].as_array() {
+        for handle in handles {
+            if let Some(h) = handle.as_str() {
+                println!("{h}");
+            }
+        }
+    } else if let Some(handle) = response["handle"].as_str() {
+        println!("{handle}");
+    } else if response.get("value").is_some() {
+        println!("{}", response["value"]);
+    }
+}
+
+// ---------- argument parsing ----------
+
+struct RawArgs {
+    op: String,
+    positionals: Vec<String>,
+    /// (name, value) — Bool flags carry None.
+    flags: Vec<(String, Option<String>)>,
+    socket: Option<String>,
+    help: bool,
+}
+
+/// First pass: split argv into positionals and flags, with the op's spec
+/// deciding which flags take values (Bool flags are presence-only).
+fn parse_raw(spec: Option<&OpSpec>) -> Result<RawArgs, String> {
+    let mut raw = std::env::args().skip(1);
+    let op = raw.next().ok_or(GENERAL_USAGE)?;
+    let mut positionals = Vec::new();
+    let mut flags = Vec::new();
+    let mut socket = None;
+    let mut help = false;
+    while let Some(arg) = raw.next() {
+        match arg.as_str() {
+            "--socket" => socket = Some(raw.next().ok_or("--socket needs a value")?),
+            "--help" => help = true,
+            "--device" => {
+                return Err(
+                    "the device option was removed; tensors always live on the GPU (mps)"
+                        .to_string(),
+                )
+            }
+            flag if flag.starts_with("--") => {
+                let name = flag.trim_start_matches("--").to_string();
+                let param = spec.and_then(|s| s.params.iter().find(|p| p.name == name));
+                match param {
+                    Some(p) if p.kind == ParamKind::Bool => flags.push((name, None)),
+                    Some(_) => {
+                        let value = raw.next().ok_or(format!("--{name} needs a value"))?;
+                        flags.push((name, Some(value)));
+                    }
+                    // Bespoke ops (tensor) validate their own flags below.
+                    None if spec.is_none() => {
+                        let value = raw.next().ok_or(format!("--{name} needs a value"))?;
+                        flags.push((name, Some(value)));
+                    }
+                    None => return Err(format!("unknown flag: --{name} (see torch {op} --help)")),
+                }
+            }
+            _ => positionals.push(arg),
+        }
+    }
+    Ok(RawArgs {
+        op,
+        positionals,
+        flags,
+        socket,
+        help,
+    })
+}
+
+/// Read exactly `n` handles from stdin (one per line). Errors on a TTY (a
+/// missing operand should be a usage error, not a hang) and on a count
+/// mismatch.
+fn stdin_handles(n: usize, op: &str) -> Result<Vec<String>, String> {
+    if n == 0 {
+        return Ok(Vec::new());
+    }
+    if std::io::stdin().is_terminal() {
+        return Err(format!(
+            "{op}: missing tensor operand(s) — pass handles as arguments or pipe them in (see torch {op} --help)"
+        ));
+    }
+    let lines = read_stdin_lines()?;
+    if lines.len() != n {
+        return Err(format!(
+            "{op}: expected {n} piped handle(s), got {}",
+            lines.len()
+        ));
+    }
+    Ok(lines)
+}
+
+fn read_stdin_lines() -> Result<Vec<String>, String> {
+    let mut text = String::new();
+    std::io::stdin()
+        .read_to_string(&mut text)
+        .map_err(|e| format!("failed to read stdin: {e}"))?;
+    Ok(text
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .map(str::to_string)
+        .collect())
+}
+
+/// Parse a flag/positional value according to its spec kind.
+fn parse_param_value(
+    op: &str,
+    param: &nutorch_ops::ParamSpec,
+    text: &str,
+) -> Result<serde_json::Value, String> {
+    let bad = || {
+        format!(
+            "{op}: parameter {} must be {:?}, got: {text}",
+            param.name, param.kind
+        )
+    };
+    match param.kind {
+        ParamKind::Int => text
+            .parse::<i64>()
+            .map(serde_json::Value::from)
+            .map_err(|_| bad()),
+        ParamKind::Float => text
+            .parse::<f64>()
+            .map(serde_json::Value::from)
+            .map_err(|_| bad()),
+        ParamKind::Scalar => {
+            if let Ok(i) = text.parse::<i64>() {
+                Ok(serde_json::Value::from(i))
+            } else {
+                text.parse::<f64>()
+                    .map(serde_json::Value::from)
+                    .map_err(|_| bad())
+            }
+        }
+        ParamKind::IntList => {
+            let value: serde_json::Value = serde_json::from_str(text).map_err(|_| bad())?;
+            if value.is_array() && value.as_array().unwrap().iter().all(|v| v.is_i64()) {
+                Ok(value)
+            } else {
+                Err(bad())
+            }
+        }
+        ParamKind::Bool => Ok(serde_json::Value::Bool(true)),
+        ParamKind::Str => Ok(serde_json::Value::from(text)),
+    }
+}
+
+/// Build the generic table-op request from the grammar.
+fn build_table_request(spec: &OpSpec, args: &RawArgs) -> Result<serde_json::Value, String> {
+    let op = spec.name;
+    let positional_params: Vec<_> = spec.params.iter().filter(|p| p.positional).collect();
+
+    // Split positionals into tensor handles and trailing positional params.
+    let (tensor_positionals, param_positionals): (Vec<&String>, Vec<&String>) = {
+        let m = args.positionals.len();
+        let p = positional_params.len();
+        if m < p {
+            let missing = positional_params[m];
+            return Err(format!(
+                "{op}: missing required parameter <{}> ({})",
+                missing.name,
+                spec.usage()
+            ));
+        }
+        let split = m - p;
+        (
+            args.positionals[..split].iter().collect(),
+            args.positionals[split..].iter().collect(),
+        )
+    };
+
+    // Tensor slots.
+    let tensors: Vec<String> = match spec.tensors {
+        Arity::Exactly(n) => {
+            if tensor_positionals.len() > n {
+                return Err(format!("{op}: too many arguments ({})", spec.usage()));
+            }
+            let from_stdin = stdin_handles(n - tensor_positionals.len(), op)?;
+            from_stdin
+                .into_iter()
+                .chain(tensor_positionals.iter().map(|s| s.to_string()))
+                .collect()
+        }
+        Arity::AtLeast(n) => {
+            let mut tensors: Vec<String> = if std::io::stdin().is_terminal() {
+                Vec::new()
+            } else {
+                read_stdin_lines()?
+            };
+            tensors.extend(tensor_positionals.iter().map(|s| s.to_string()));
+            if tensors.len() < n {
+                return Err(format!(
+                    "{op}: needs at least {n} tensors, got {} ({})",
+                    tensors.len(),
+                    spec.usage()
+                ));
+            }
+            tensors
+        }
+    };
+
+    // Params: positionals (in spec order), then flags.
+    let mut params = serde_json::Map::new();
+    for (param, text) in positional_params.iter().zip(param_positionals.iter()) {
+        params.insert(param.name.to_string(), parse_param_value(op, param, text)?);
+    }
+    for (name, value) in &args.flags {
+        let param = spec
+            .params
+            .iter()
+            .find(|p| p.name == *name)
+            .expect("validated in parse_raw");
+        let parsed = match value {
+            None => serde_json::Value::Bool(true),
+            Some(text) => parse_param_value(op, param, text)?,
+        };
+        params.insert(name.clone(), parsed);
+    }
+
+    Ok(serde_json::json!({ "op": op, "tensors": tensors, "params": params }))
+}
+
+// ---------- bespoke ops ----------
+
+fn positional_or_stdin(args: &RawArgs, index: usize, what: &str) -> Result<String, String> {
+    if let Some(value) = args.positionals.get(index) {
+        return Ok(value.clone());
+    }
+    if std::io::stdin().is_terminal() {
+        return Err(format!(
+            "missing {what}: pass it as an argument or pipe it in"
+        ));
+    }
+    let lines = read_stdin_lines()?;
+    lines
+        .into_iter()
+        .next()
+        .ok_or_else(|| format!("missing {what}: pass it as an argument or pipe it in"))
+}
+
+fn build_bespoke_request(args: &RawArgs) -> Result<serde_json::Value, String> {
+    match args.op.as_str() {
+        "tensor" => {
+            let mut dtype = None;
+            for (name, value) in &args.flags {
+                match name.as_str() {
+                    "dtype" => dtype = value.clone(),
+                    other => return Err(format!("unknown flag: --{other}")),
+                }
+            }
+            let data_text = positional_or_stdin(args, 0, "tensor data")?;
+            let data: serde_json::Value = serde_json::from_str(&data_text)
+                .map_err(|e| format!("tensor data is not valid JSON: {e}"))?;
+            Ok(serde_json::json!({ "op": "tensor", "data": data, "dtype": dtype }))
+        }
+        "value" => {
+            if let Some((name, _)) = args.flags.first() {
+                return Err(format!("unknown flag: --{name}"));
+            }
+            let handle = positional_or_stdin(args, 0, "tensor handle")?;
+            Ok(serde_json::json!({ "op": "value", "handle": handle }))
+        }
+        other => Err(format!("unknown op: {other} (see `torch ops`)")),
+    }
+}
+
+// ---------- daemon verbs ----------
+
 fn daemon_pid(socket: &PathBuf) -> Result<u64, String> {
     let status = exchange(socket, &serde_json::json!({"op":"status"}))?;
     status["value"]["pid"]
@@ -274,9 +430,9 @@ fn print_status(status: &serde_json::Value) {
 
 /// `torch daemon <verb>`: positionals only, never stdin (these verbs have no
 /// pipeline form). status/ttl/stop never spawn; start/restart do.
-fn run_daemon_verb(args: &Args, socket: &PathBuf) -> Result<(), String> {
+fn run_daemon_verb(args: &RawArgs, socket: &PathBuf) -> Result<(), String> {
     let verb = args
-        .positional
+        .positionals
         .first()
         .ok_or("usage: torch daemon <status|ttl|stop|restart|start>")?;
     match verb.as_str() {
@@ -290,7 +446,7 @@ fn run_daemon_verb(args: &Args, socket: &PathBuf) -> Result<(), String> {
         }
         "ttl" => {
             let duration = args
-                .positional
+                .positionals
                 .get(1)
                 .ok_or("usage: torch daemon ttl <duration>  (e.g. 30m, 2h, none)")?;
             if !daemon_alive(socket) {
@@ -344,8 +500,63 @@ fn run_daemon_verb(args: &Args, socket: &PathBuf) -> Result<(), String> {
     }
 }
 
+// ---------- help & ops listing ----------
+
+const GENERAL_USAGE: &str = "usage: torch <op> [tensors...] [params...] [--flags]\n       torch ops              list available operations\n       torch <op> --help      usage for one operation\n       torch daemon <verb>    status | ttl | stop | restart | start";
+
+fn print_ops() {
+    for category in nutorch_ops::categories() {
+        println!("{category}:");
+        for spec in nutorch_ops::OPS.iter().filter(|s| s.category == category) {
+            println!("  {:<14} {}", spec.name, spec.summary);
+        }
+    }
+    println!("\nbespoke:");
+    println!(
+        "  {:<14} create a tensor from JSON data (--dtype)",
+        "tensor"
+    );
+    println!("  {:<14} read a tensor back as JSON", "value");
+}
+
+fn print_op_help(op: &str) {
+    match op {
+        "tensor" => println!("usage: torch tensor <json-data> [--dtype <kind>]"),
+        "value" => println!("usage: torch value [handle]   (or pipe the handle in)"),
+        "daemon" => println!("usage: torch daemon <status|ttl|stop|restart|start>"),
+        name => {
+            if let Some(spec) = nutorch_ops::find(name) {
+                println!("{}", spec.usage());
+                println!("  {}", spec.summary);
+            } else {
+                println!("unknown op: {name}");
+            }
+        }
+    }
+}
+
+// ---------- main ----------
+
 fn run() -> Result<(), String> {
-    let args = parse_args()?;
+    let op_name = std::env::args().nth(1).ok_or(GENERAL_USAGE)?;
+
+    if op_name == "ops" {
+        print_ops();
+        return Ok(());
+    }
+    if op_name == "--help" || op_name == "help" {
+        println!("{GENERAL_USAGE}");
+        return Ok(());
+    }
+
+    let spec = nutorch_ops::find(&op_name);
+    let args = parse_raw(spec)?;
+
+    if args.help {
+        print_op_help(&args.op);
+        return Ok(());
+    }
+
     let socket = args
         .socket
         .as_ref()
@@ -356,17 +567,17 @@ fn run() -> Result<(), String> {
         return run_daemon_verb(&args, &socket);
     }
 
-    let request = build_request(&args)?;
-    // Auto-start (issue 0004): tensor ops spawn the daemon when it is down.
+    let request = match spec {
+        Some(spec) => build_table_request(spec, &args)?,
+        None => build_bespoke_request(&args)?,
+    };
+
+    // Auto-start (issue 0004): tensor work spawns the daemon when it is down.
     if !daemon_alive(&socket) {
         ensure_daemon(&socket)?;
     }
     let response = exchange(&socket, &request)?;
-    if let Some(handle) = response["handle"].as_str() {
-        println!("{handle}");
-    } else {
-        println!("{}", response["value"]);
-    }
+    print_response(&response);
     Ok(())
 }
 

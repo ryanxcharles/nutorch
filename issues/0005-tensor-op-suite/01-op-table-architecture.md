@@ -2,6 +2,16 @@
 [implementer]
 agent = "claude-code"
 model = "claude-fable-5"
+
+[review.design]
+agent = "claude-code"
+subagent = "adversarial-reviewer"
+model = "claude-opus"
+
+[review.result]
+agent = "claude-code"
+subagent = "adversarial-reviewer"
+model = "claude-opus"
 +++
 
 # Experiment 1: The op table — architecture, grammar, errors, golden tests, and 15 representative ops
@@ -207,3 +217,94 @@ determinism holds (validating the recorded randn fallback); the broadcast walk
 is correct PyTorch semantics; the current Bool-tensor path errors cleanly today,
 so the new Bool serialization is necessary and regression-free; and the lib+bin
 restructure is mechanical.
+
+## Result
+
+**Result:** Pass
+
+All nine checks pass; the loom works. Highlights from the transcript:
+
+```
+sub, three ways (all positional / stdin-prefix / two-line stdin): [4.0,5.0] ×3
+cat, pure-stdin vs positional:                  [1.0,2.0,3.0] ×2
+stdin untouched when slots full:                printf garbage | sub $a $b → [4.0,5.0]
+sort composes:    two handles, two lines → values [1.0,2.0,3.0], indices [1,2,0]
+bool tensors:     eq → [true,true]
+error w/ code:    {"ok":false,"code":"shape_mismatch","error":"add: shapes
+                   [2, 3] and [4] are not broadcastable"}
+determinism:      manual_seed 42 → identical randn twice — AND equal to the
+                   Python-generated golden (full parity)
+torch ops:        17 lines = 15 table + 2 bespoke (programmatic count match)
+migrated ops:     PoC pipelines still exact ([5.0,7.0,9.0], 1000.0)
+```
+
+**Hygiene:** `cargo build` 0 warnings; `cargo test` green — 37 tests (3
+ops-crate, 30 daemon unit incl. 15 new dispatch tests, 29-case golden harness as
+1 test, 3 MPS smoke); `cargo fmt`/`dprint check` clean (after a result-review
+finding: the generator initially emitted 1-space JSON that failed dprint — fixed
+at the source with `indent=2` so the committed golden.json is both dprint-clean
+and regeneration-stable); `git status --porcelain v1/` empty. Golden suite:
+**29/29**, including the mean-int-dtype case and three error cases.
+
+**Three significant finds during implementation, all recorded:**
+
+1. **`tch::manual_seed` does not reach the MPS generator** — the design's
+   recorded RNG risk fired harder than anticipated: not just Python-parity but
+   _daemon-side determinism_ failed. The fix is better than the planned
+   fallback: `randn` generates on the seeded **CPU** generator and transfers to
+   MPS — the CPU generator is exactly the one Python's `torch.manual_seed`
+   drives, so this buys determinism AND full bitwise golden parity (verified).
+   Consequence: float64 randn is rejected (`bad_dtype`) since the result must
+   live on MPS. The generator mirrors the same CPU→MPS construction.
+2. **serde_json's default float parsing is imprecise by design** (a documented
+   1-ULP fast path). The golden harness caught it: a correct 17-digit value in
+   golden.json parsed back 1 ULP off. Fixed by enabling serde_json's
+   `float_roundtrip` feature in both binaries — this matters beyond tests, since
+   tensor _data_ enters the daemon through the same parser. The golden pipeline
+   paid for itself before the first sweep.
+3. **Rust `const` tables are inlined per use-site** — `find()`'s `OPS` and a
+   caller's `OPS` had different addresses, breaking a pointer-identity test. The
+   table is a `static` now.
+
+**One check adapted:** the TTY-stdin usage-error path (`torch sub $a` at an
+interactive terminal must error, not hang) cannot be exercised from this non-TTY
+harness; verified by inspection of the `IsTerminal` branch and left to manual
+confirmation. All other grammar paths verified live.
+
+## Conclusion
+
+The architecture this issue needs is real and proven: a 15-op table covering
+every common structural shape, a generic wire op with machine-readable error
+codes, the stdin-prefix grammar (both principle amendments recorded in
+AGENTS.md), PyTorch broadcasting with named-shape errors, Bool-tensor and
+multi-return support, generated discoverability, and a 29-case golden pipeline
+against the exact PyTorch the daemon links — which caught a real float-precision
+bug in its first hour.
+
+The category sweeps can now begin: each is table rows + one-line apply
+mappings + golden cases. Sweep order per the issue: pointwise (the big one — and
+it owes the deferred tensor-valued-param spec extension for clamp's tensor
+bounds), reductions, comparison, linalg, shape/indexing, creation.
+
+## Result Review
+
+**Reviewer:** `adversarial-reviewer` subagent (fresh context, read-only),
+reviewing the pre-commit working tree. **First pass: CHANGES REQUIRED** — one
+Required finding: the committed golden.json failed `dprint check` (the generator
+emitted 1-space JSON), and the reviewer proved the naive fix (manual reformat)
+would have broken the regeneration-determinism gate — the two requirements were
+mutually exclusive as built. **Fixed at the source**: `gen-golden.py` emits
+`indent=2`; regenerated; the Result's hygiene claim corrected to disclose the
+finding. **Re-review (fresh context): APPROVED** — the reviewer verified the
+file is byte-stable across a real regeneration (SHA-256 identical) AND
+dprint-clean with the file genuinely in dprint's include scope, and that the
+harness still passes 29/29.
+
+Beyond the finding, the first-pass reviewer independently reproduced everything:
+the full test suite, generator determinism, every live grammar and error-code
+check in the transcript, the PoC pipelines, `torch ops` completeness, both
+binaries' `float_roundtrip` features, `OPS` as a static, the recorded
+retirements of principles 2 and 4 (not silent edits), and the fairness of the
+randn claim (it also confirmed Python's `torch.manual_seed` DOES reseed MPS —
+the gap is specifically tch's binding — consistent with how the Result states
+it).

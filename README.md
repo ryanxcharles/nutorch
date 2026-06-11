@@ -40,6 +40,9 @@ torch daemon restart     # fresh daemon, empty registry
 
 The default TTL is configurable via `NUTORCHD_TTL` (e.g. `30m`, `2h`, `none`).
 
+Run `torch ops` to list every available operation, and `torch <op> --help` for
+any one of them.
+
 ## Status
 
 **Proof of concept working** (issue 0002): daemon, thin client, six ops

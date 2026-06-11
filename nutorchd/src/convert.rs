@@ -115,6 +115,8 @@ pub fn tensor_to_json(tensor: &Tensor) -> Result<serde_json::Value, String> {
             Kind::Float | Kind::Double | Kind::Half => {
                 Ok(serde_json::Value::from(tensor.double_value(&[])))
             }
+            // Comparison ops return Bool tensors (issue 0005).
+            Kind::Bool => Ok(serde_json::Value::Bool(tensor.int64_value(&[]) != 0)),
             _ => Err(format!("cannot convert tensor of type {kind:?}")),
         };
     }
