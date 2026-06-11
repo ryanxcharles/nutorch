@@ -105,3 +105,8 @@ formats for very large tensors.
   output is described.
 - Standard hygiene gates (build clean, fmt, dprint on touched files, tests
   green, `v1/` untouched) and the AI review gates apply to every experiment.
+
+## Experiments
+
+- [Experiment 1: `torch free` — the first verb that removes](01-torch-free.md) —
+  **Designed**
