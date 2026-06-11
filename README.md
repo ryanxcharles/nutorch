@@ -163,8 +163,9 @@ torch --version
 
 The installed binaries are relocatable: libtorch's required dylibs are copied
 into the prefix and resolved by a baked relative rpath — no environment
-variables, no checkout needed at runtime. A Homebrew tap is the issue-0011
-follow-up.
+variables, no checkout needed at runtime. A Homebrew tap
+(`brew tap nutorch/nutorch`) is in progress — issue 0011; the formula lives at
+`dist/nutorch.rb`.
 
 ## Status
 

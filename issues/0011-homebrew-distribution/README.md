@@ -96,4 +96,5 @@ beyond what brew gives for free.
   a 211MB prefix; 0.1.0 stamped everywhere; the 4-dylib closure confirmed incl.
   the libomp stowaway)
 - [Experiment 2: The formula — `brew install` proven hermetically](02-the-formula.md)
-  — **Designed**
+  — **Pass** (local tap + 32s keg build + MPS live from /opt/homebrew/bin with
+  zero env vars; brew test green; brew 6.0's no-loose-formulae rule absorbed)
