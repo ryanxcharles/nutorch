@@ -364,8 +364,8 @@ pub fn execute_table(
         Ok(Applied::Tensors(outputs)) => {
             debug_assert!(match spec.results {
                 ResultKind::Handles(n) => n == outputs.len(),
-                // max/min/median: 1 without --dim, values+indices with it.
-                ResultKind::VariableHandles => (1..=2).contains(&outputs.len()),
+                // max/min/median: 1 or 2; split/chunk: N >= 1 (exp 4).
+                ResultKind::VariableHandles => !outputs.is_empty(),
                 _ => false,
             });
             Response::handles(outputs.into_iter().map(|t| registry.insert(t)).collect())
@@ -716,6 +716,121 @@ fn apply(spec: &OpSpec, t: &[&Tensor], p: &Params) -> Result<Applied, OpError> {
         "argsort" => one(
             op,
             t[0].f_argsort(p.int("dim").unwrap_or(-1), p.bool("descending")),
+        ),
+        // --- linalg + shape sweep (issue 0005 exp 4) ---
+        "matmul" => one(op, t[0].f_matmul(t[1])),
+        "bmm" => one(op, t[0].f_bmm(t[1])),
+        "dot" => one(op, t[0].f_dot(t[1])),
+        "outer" => one(op, t[0].f_outer(t[1])),
+        "einsum" => one(
+            op,
+            Tensor::f_einsum(p.str("equation").expect("required"), t, None::<&[i64]>),
+        ),
+        "tril" => one(op, t[0].f_tril(p.int("diagonal").unwrap_or(0))),
+        "triu" => one(op, t[0].f_triu(p.int("diagonal").unwrap_or(0))),
+        "diag" => one(op, t[0].f_diag(p.int("diagonal").unwrap_or(0))),
+        "trace" => one(op, t[0].f_trace()),
+        "det" => one(op, t[0].f_det()),
+        "inverse" => one(op, t[0].f_inverse()),
+        "svd" => t[0]
+            .f_svd(false, true)
+            .map(|(u, s, v)| Applied::Tensors(vec![u, s, v]))
+            .map_err(|e| tch(op, e)),
+        "solve" => one(op, Tensor::f_linalg_solve(t[0], t[1], true)),
+        "reshape" => one(op, t[0].f_reshape(p.int_list("shape").expect("required"))),
+        "permute" => one(op, t[0].f_permute(p.int_list("dims").expect("required"))),
+        "transpose" => one(
+            op,
+            t[0].f_transpose(
+                p.int("dim0").expect("required"),
+                p.int("dim1").expect("required"),
+            ),
+        ),
+        "t" => {
+            let size = t[0].size();
+            if size.len() != 2 {
+                return Err((
+                    "shape_mismatch",
+                    format!("t: requires a 2-D tensor, got shape {size:?}"),
+                ));
+            }
+            one(op, t[0].f_tr())
+        }
+        "squeeze" => match p.int("dim") {
+            Some(dim) => one(op, t[0].f_squeeze_dim(dim)),
+            None => one(op, t[0].f_squeeze()),
+        },
+        "unsqueeze" => one(op, t[0].f_unsqueeze(p.int("dim").expect("required"))),
+        "flatten" => one(
+            op,
+            t[0].f_flatten(
+                p.int("start_dim").unwrap_or(0),
+                p.int("end_dim").unwrap_or(-1),
+            ),
+        ),
+        "stack" => one(op, Tensor::f_stack(t, p.int("dim").unwrap_or(0))),
+        "split" => t[0]
+            .f_split(
+                p.int("split_size").expect("required"),
+                p.int("dim").unwrap_or(0),
+            )
+            .map(Applied::Tensors)
+            .map_err(|e| tch(op, e)),
+        "chunk" => t[0]
+            .f_chunk(
+                p.int("chunks").expect("required"),
+                p.int("dim").unwrap_or(0),
+            )
+            .map(Applied::Tensors)
+            .map_err(|e| tch(op, e)),
+        "gather" => one(
+            op,
+            t[0].f_gather(p.int("dim").expect("required"), t[1], false),
+        ),
+        "index_select" => one(
+            op,
+            t[0].f_index_select(p.int("dim").expect("required"), t[1]),
+        ),
+        "masked_select" => {
+            // Numeric mask cast via != 0 (documented nutorch-ism: no bool
+            // input path exists yet).
+            let mask = t[1].f_ne(0).map_err(|e| tch(op, e))?;
+            one(op, t[0].f_masked_select(&mask))
+        }
+        "where" => {
+            // Numeric cond cast via != 0 (documented nutorch-ism).
+            let cond = t[0].f_ne(0).map_err(|e| tch(op, e))?;
+            one(op, t[1].f_where_self(&cond, t[2]))
+        }
+        "narrow" => one(
+            op,
+            t[0].f_narrow(
+                p.int("dim").expect("required"),
+                p.int("start").expect("required"),
+                p.int("length").expect("required"),
+            ),
+        ),
+        "flip" => one(op, t[0].f_flip(p.int_list("dims").expect("required"))),
+        "roll" => {
+            let shifts = p.int_list("shifts").expect("required");
+            let dims = p.int_list("dims").unwrap_or_default();
+            one(op, t[0].f_roll(&shifts, &dims))
+        }
+        "repeat" => one(op, t[0].f_repeat(p.int_list("repeats").expect("required"))),
+        "repeat_interleave" => one(
+            op,
+            t[0].f_repeat_interleave_self_int(
+                p.int("repeats").expect("required"),
+                p.int("dim"),
+                None,
+            ),
+        ),
+        "movedim" => one(
+            op,
+            t[0].f_movedim(
+                p.int("source").expect("required"),
+                p.int("destination").expect("required"),
+            ),
         ),
         "manual_seed" => {
             tch::manual_seed(p.int("seed").expect("required"));

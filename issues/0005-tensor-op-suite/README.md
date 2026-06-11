@@ -176,4 +176,5 @@ inside it).
   — **Pass** (36 ops, table 72→108; goldens 90→134 first-run; VariableHandles
   cost exactly one enum variant; zero MPS exclusions)
 - [Experiment 4: Linalg + shape/indexing sweep (~32 ops)](04-linalg-shape-sweep.md)
-  — **Designed**
+  — **Pass** (33 ops, table 108→141; goldens 134→170 first-run; one MPS
+  exclusion: take; dense linalg all runs on MPS)

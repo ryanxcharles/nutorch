@@ -2,6 +2,16 @@
 [implementer]
 agent = "claude-code"
 model = "claude-fable-5"
+
+[review.design]
+agent = "claude-code"
+subagent = "adversarial-reviewer"
+model = "claude-opus"
+
+[review.result]
+agent = "claude-code"
+subagent = "adversarial-reviewer"
+model = "claude-opus"
 +++
 
 # Experiment 4: Linalg + shape/indexing sweep (~32 ops)
@@ -86,3 +96,56 @@ family runs on MPS in the linked torch — and one forewarning recorded: **`take
 is NOT implemented on MPS** and will become this sweep's recorded exclusion.
 Approved with the masked_select fix in place (the fix is the reviewer's own
 prescription verbatim).
+
+## Result
+
+**Result:** Pass
+
+33 new ops landed (13 linalg, 20 shape/indexing); the table grew 108 → 141. The
+declared structural items cost exactly what was declared: the VariableHandles
+assert widened to `>= 1` (split/chunk return N), einsum's variadic+Str
+combination rode the existing grammar, and the numeric→bool cast bridges
+`where`'s cond and `masked_select`'s mask identically.
+
+- **Golden suite: 170/170** (was 134), first run; byte-stable (sha256
+  `07506591…` twice); dprint-clean; floor 165.
+- **Hygiene**: build 0 warnings; fmt clean; all tests green; `v1/` untouched.
+- **Live**: `split` → three handles each piping to value; `einsum
+  "ij,jk->ik"`
+  exactly equals `mm`; `where`/`masked_select` with numeric cond/mask; `gather`
+  with an int64 index; `stack` of three via stdin `--dim 1`; `torch ops` = 143 =
+  141 + 2.
+- **MPS oracle exclusions: one** — **`take`**:
+  `The operator 'aten::take' is
+  not currently implemented for the MPS device`
+  (forewarned by the design reviewer, confirmed, excluded; `torch take` →
+  `unknown_op`). The entire dense-linalg family (det, inverse, svd, solve,
+  einsum, bmm) runs on MPS in the linked PyTorch and shipped.
+- **One implementation note**: `svd` maps to the classic `torch.svd`
+  decomposition (`some=False, compute_uv=True` ↔ tch `f_svd(false, true)`);
+  goldens pin the convention.
+
+## Conclusion
+
+Five categories down: 141 ops, all golden-verified. The structurally richest
+sweep confirmed the architecture's last open shapes: list-valued results,
+Str+variadic, ternary ops, and index-tensor operands all rode the existing loom.
+What remains for the final sweep: creation
+(`zeros ones eye arange
+linspace rand randint` + `*_like`), the deferred
+tensor-or-scalar param extension (clamp tensor bounds, pow tensor exponent), and
+the issue close.
+
+## Result Review
+
+**Reviewer:** `adversarial-reviewer` subagent (fresh context, read-only),
+reviewing the pre-commit working tree. **Verdict: APPROVED — no Required,
+Optional, or Nit findings.** The reviewer reproduced every gate fresh (0-warning
+full recompile, all suites, byte-stable regeneration matching the recorded sha
+exactly), verified the masked_select cast in code+golden+live, reproduced the
+`aten::take` MPS error verbatim in Python, confirmed the svd convention
+element-for-element against fresh `torch.svd(some=False)`, checked the
+where-cast on a `[2, 0, 0.5]` cond (non-zero→true, PyTorch bool semantics),
+exercised graceful failure paths (missing `--equation`, wrong-dtype index — no
+daemon panic), and counted the live `torch ops` output as authoritative for the
+141+2 claim.

@@ -312,7 +312,75 @@ ok("rc_topk_smallest", "topk", [t([1.0, 5.0, 3.0, 4.0])], {"k": 2, "smallest": T
 ok("rc_argsort", "argsort", [t([3.0, 1.0, 2.0])], {"descending": True},
    lambda ts: [torch.argsort(ts[0], descending=True)])
 
+# --- linalg + shape sweep (issue 0005 exp 4) ---
+M2 = [[1.0, 2.0], [3.0, 4.0]]
+ok("ls_matmul", "matmul", [t(M2), t(M2)], {}, lambda ts: [ts[0] @ ts[1]])
+ok("ls_bmm", "bmm", [t([M2, M2]), t([M2, M2])], {},
+   lambda ts: [torch.bmm(ts[0], ts[1])])
+ok("ls_dot", "dot", [t([1.0, 2.0, 3.0]), t([4.0, 5.0, 6.0])], {},
+   lambda ts: [torch.dot(ts[0], ts[1])])
+ok("ls_outer", "outer", [t([1.0, 2.0]), t([3.0, 4.0, 5.0])], {},
+   lambda ts: [torch.outer(ts[0], ts[1])])
+ok("ls_einsum_mm", "einsum", [t(M2), t(M2)], {"equation": "ij,jk->ik"},
+   lambda ts: [torch.einsum("ij,jk->ik", ts[0], ts[1])])
+ok("ls_einsum_trace", "einsum", [t(M2)], {"equation": "ii"},
+   lambda ts: [torch.einsum("ii", ts[0])])
+M3 = [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]
+ok("ls_tril", "tril", [t(M3)], {}, lambda ts: [torch.tril(ts[0])])
+ok("ls_triu_diag1", "triu", [t(M3)], {"diagonal": 1},
+   lambda ts: [torch.triu(ts[0], diagonal=1)])
+ok("ls_diag_extract", "diag", [t(M3)], {}, lambda ts: [torch.diag(ts[0])])
+ok("ls_diag_build", "diag", [t([1.0, 2.0, 3.0])], {},
+   lambda ts: [torch.diag(ts[0])])
+ok("ls_trace", "trace", [t(M2)], {}, lambda ts: [torch.trace(ts[0])])
+INV = [[4.0, 7.0], [2.0, 6.0]]
+ok("ls_det", "det", [t(INV)], {}, lambda ts: [torch.det(ts[0])])
+ok("ls_inverse", "inverse", [t(INV)], {}, lambda ts: [torch.inverse(ts[0])])
+ok("ls_svd", "svd", [t(M2)], {},
+   lambda ts: list(torch.svd(ts[0], some=False, compute_uv=True)))
+ok("ls_solve", "solve", [t(INV), t([[1.0], [2.0]])], {},
+   lambda ts: [torch.linalg.solve(ts[0], ts[1])])
+V6 = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+ok("ls_reshape", "reshape", [t(V6)], {"shape": [2, 3]},
+   lambda ts: [ts[0].reshape(2, 3)])
+ok("ls_reshape_infer", "reshape", [t(V6)], {"shape": [3, -1]},
+   lambda ts: [ts[0].reshape(3, -1)])
+ok("ls_permute", "permute", [t([M2])], {"dims": [2, 0, 1]},
+   lambda ts: [ts[0].permute(2, 0, 1)])
+ok("ls_transpose", "transpose", [t(M3)], {"dim0": 0, "dim1": 1},
+   lambda ts: [ts[0].transpose(0, 1)])
+ok("ls_t", "t", [t(M2)], {}, lambda ts: [ts[0].t()])
+ok("ls_squeeze", "squeeze", [t([[1.0, 2.0]])], {}, lambda ts: [ts[0].squeeze()])
+ok("ls_unsqueeze", "unsqueeze", [t([1.0, 2.0])], {"dim": 0},
+   lambda ts: [ts[0].unsqueeze(0)])
+ok("ls_flatten", "flatten", [t([M2])], {}, lambda ts: [ts[0].flatten()])
+ok("ls_stack", "stack", [t([1.0, 2.0]), t([3.0, 4.0]), t([5.0, 6.0])], {"dim": 1},
+   lambda ts: [torch.stack(ts, dim=1)])
+ok("ls_split", "split", [t(V6)], {"split_size": 2},
+   lambda ts: list(torch.split(ts[0], 2)))
+ok("ls_chunk", "chunk", [t(V6)], {"chunks": 3},
+   lambda ts: list(torch.chunk(ts[0], 3)))
+ok("ls_gather", "gather", [t(M2), t([[0, 0], [1, 0]], "int64")], {"dim": 1},
+   lambda ts: [torch.gather(ts[0], 1, ts[1])])
+ok("ls_index_select", "index_select", [t(M3), t([0, 2], "int64")], {"dim": 0},
+   lambda ts: [torch.index_select(ts[0], 0, ts[1])])
+ok("ls_masked_select", "masked_select", [t([1.0, 2.0, 3.0]), t([1.0, 0.0, 1.0])], {},
+   lambda ts: [torch.masked_select(ts[0], ts[1] != 0)])
+ok("ls_where", "where", [t([1.0, 0.0, 1.0]), t([10.0, 20.0, 30.0]), t([-1.0, -2.0, -3.0])], {},
+   lambda ts: [torch.where(ts[0] != 0, ts[1], ts[2])])
+ok("ls_narrow", "narrow", [t(V6)], {"dim": 0, "start": 1, "length": 3},
+   lambda ts: [ts[0].narrow(0, 1, 3)])
+ok("ls_flip", "flip", [t(M2)], {"dims": [0]}, lambda ts: [ts[0].flip(0)])
+ok("ls_roll", "roll", [t(V6)], {"shifts": [2]}, lambda ts: [ts[0].roll(2)])
+ok("ls_repeat", "repeat", [t([1.0, 2.0])], {"repeats": [2, 3]},
+   lambda ts: [ts[0].repeat(2, 3)])
+ok("ls_repeat_interleave", "repeat_interleave", [t([1.0, 2.0])], {"repeats": 3},
+   lambda ts: [ts[0].repeat_interleave(3)])
+ok("ls_movedim", "movedim", [t([M2])], {"source": 0, "destination": 2},
+   lambda ts: [ts[0].movedim(0, 2)])
+
 out = pathlib.Path(__file__).resolve().parent.parent / "nutorchd" / "tests" / "golden.json"
+
 
 
 out.write_text(json.dumps(cases, indent=2) + "\n")
