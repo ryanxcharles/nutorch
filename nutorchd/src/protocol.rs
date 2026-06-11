@@ -29,6 +29,12 @@ pub enum Request {
     Value {
         handle: String,
     },
+    Status,
+    #[serde(rename = "set_ttl")]
+    SetTtl {
+        ttl: String,
+    },
+    Shutdown,
 }
 
 #[derive(Debug, Serialize)]

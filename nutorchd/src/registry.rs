@@ -24,6 +24,19 @@ impl Registry {
     pub fn get(&self, handle: &str) -> Option<&Tensor> {
         self.tensors.get(handle)
     }
+
+    pub fn len(&self) -> usize {
+        self.tensors.len()
+    }
+
+    /// Approximate bytes held: Σ numel × element size. (Removed as dead code
+    /// in issue 0002; legitimately needed by `status` since issue 0004.)
+    pub fn approx_bytes(&self) -> u64 {
+        self.tensors
+            .values()
+            .map(|t| t.numel() as u64 * t.kind().elt_size_in_bytes() as u64)
+            .sum()
+    }
 }
 
 #[cfg(test)]

@@ -115,4 +115,5 @@ structural change that makes expiry possible — settled in the experiment.
 ## Experiments
 
 - [Experiment 1: Daemon-side lifecycle — idle TTL, clean exits, probe-bind, and the three protocol ops](01-daemon-side-lifecycle.md)
-  — **Designed**
+  — **Pass** (expiry/renewal/status/set_ttl/shutdown/signals all behave; both
+  socket debts closed; 32 tests green)

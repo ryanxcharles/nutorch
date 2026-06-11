@@ -2,6 +2,16 @@
 [implementer]
 agent = "claude-code"
 model = "claude-fable-5"
+
+[review.design]
+agent = "claude-code"
+subagent = "adversarial-reviewer"
+model = "claude-opus"
+
+[review.result]
+agent = "claude-code"
+subagent = "adversarial-reviewer"
+model = "claude-opus"
 +++
 
 # Experiment 1: Daemon-side lifecycle — idle TTL, clean exits, probe-bind, and the three protocol ops
@@ -139,3 +149,76 @@ distinct from the fixed live-steal debt; (2) check 3's renewal timing got wider
 margins plus a ±1s watcher-granularity note; (3) the `status.log` field is now
 documented as a convention report that may not exist for manually-started
 daemons.
+
+## Result
+
+**Result:** Pass
+
+All nine checks pass. The behavioral transcript, abridged:
+
+```
+check 2 (idle expiry, --ttl 3s):  ttl: 3 idle: 0 → process exited on its own;
+                                  socket file gone; log: "idle ttl expired; exiting"
+check 3 (sliding renewal, 4s):    alive past original deadline (renewed);
+                                  still serving; expired after renewal lapsed
+check 4 (activity semantics):     idle 1 → 2 across two status calls (status
+                                  does not reset); 0 after a tensor op
+check 5 (set_ttl live):           set_ttl 2s → remaining 1 → expired without
+                                  restart; set_ttl none → alive past any
+                                  deadline; "bogus" → one-line error
+check 6 (shutdown op):            {"ok":true,"value":"shutting down"} received,
+                                  process exited, socket gone
+check 7 (probe-bind):             second daemon exits 0 ("already running");
+                                  FIRST daemon survives and its tensor is still
+                                  readable ([42.0]); kill -9 leaves a stale
+                                  socket; a new daemon binds over it normally
+check 8 (signals):                SIGTERM and SIGINT both → socket cleaned up
+check 9 (default):                ttl_secs: 3600 with no flag and no env
+```
+
+**Hygiene:** `cargo build` 0 warnings; `cargo test` green — 32 tests (29 unit: 7
+conversion + 1 registry + 6 lifecycle-module + 15 dispatch including the four
+new lifecycle-dispatch tests; plus 3 MPS smoke tests);
+`cargo fmt --all -- --check` clean; `dprint check` clean;
+`git status --porcelain v1/` empty.
+
+**One implementation find:** serde's `rename_all = "lowercase"` maps `SetTtl` to
+`setttl`, not the design's wire name `set_ttl` — caught immediately by the new
+dispatch unit test, fixed with an explicit `#[serde(rename = "set_ttl")]`. The
+test suite earned its keep before the wire ever did.
+
+Also updated: the daemon's module doc, which still described the issue-0002
+"unconditional stale-socket removal" simplification this experiment removed.
+
+## Conclusion
+
+The daemon now manages its own life: it yields to a living sibling instead of
+stealing its socket, renews its lease on every tensor op, reports its own vital
+signs (`status`), takes runtime TTL changes (`set_ttl`), dies politely on
+request (`shutdown`), on signal (SIGTERM/SIGINT), and of old age (idle expiry) —
+and in every one of those exits it sweeps its own socket. Both recorded socket
+debts from issues 0002/0003 are closed; the remaining simultaneous-start TOCTOU
+window is documented and deferred as designed.
+
+The next experiment is the client half: auto-spawn on connect failure (spawn
+detached → redirect output to the conventional `.log` path → poll the socket →
+retry), the `torch daemon status|ttl|stop|restart|start` verbs over the three
+new ops, and the doc updates (README/AGENTS.md gain the "you never start the
+daemon" story). The daemon side was built to make that layer thin: every verb is
+one wire op plus formatting.
+
+## Result Review
+
+**Reviewer:** `adversarial-reviewer` subagent (fresh context, read-only),
+reviewing the pre-commit working tree. **Verdict: APPROVED — no Required,
+Optional, or Nit findings.** The reviewer independently reproduced every gate
+and every behavioral check on its own daemons (expiry, renewal, activity
+semantics, set_ttl none/bogus, graceful shutdown ordering, probe-bind survival
+with the tensor still readable, both signals, the 3600s default) — and went
+beyond the recorded checks to verify the TTL precedence chain directly
+(`--ttl 7s` beats `NUTORCHD_TTL=99s`; env-only is honored). It cleared the
+scrutinized subtleties: no mutex deadlock/poisoning risk (no lock held across
+blocking work), the new unknown-argument rejection breaks nothing recorded (all
+prior invocations use only `--socket`), the ms-granularity unit tests
+legitimately bypass the second-granularity wire parser, and both deviations (the
+serde `set_ttl` rename, the module-doc rewrite) are honestly recorded.
