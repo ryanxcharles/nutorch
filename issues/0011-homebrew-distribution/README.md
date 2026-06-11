@@ -95,3 +95,5 @@ beyond what brew gives for free.
   — **Pass** (the renamed-away-libtorch proof: installed binaries serve MPS from
   a 211MB prefix; 0.1.0 stamped everywhere; the 4-dylib closure confirmed incl.
   the libomp stowaway)
+- [Experiment 2: The formula — `brew install` proven hermetically](02-the-formula.md)
+  — **Designed**
