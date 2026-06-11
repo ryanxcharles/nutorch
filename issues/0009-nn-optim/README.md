@@ -116,3 +116,8 @@ result, goldens against the exact linked PyTorch on MPS, oracle-decided
 exclusions recorded. The issue closes only when the training-loop acceptance
 script runs end to end and the full module/ optimizer scope above is delivered
 or honestly excluded.
+
+## Experiments
+
+- [Experiment 1: Typed handles and the typed registry](01-typed-handles.md) —
+  **Designed**
