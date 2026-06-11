@@ -114,3 +114,5 @@ formats for very large tensors.
 - [Experiment 2: `torch tensors` — the listing that makes `free` targetable](02-torch-tensors.md)
   — **Pass** (oldest-first census with per-tensor age/idle; bool dtype listed
   correctly; the awk→free composition works; no spawn, no lease touch)
+- [Experiment 3: The lossless round-trip — bool, non-finite, and the meta envelope](03-lossless-roundtrip.md)
+  — **Designed**
