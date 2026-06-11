@@ -56,6 +56,14 @@ torch nn parameters $m                           # tensor:// handles — LIVE vi
 torch nn info $m
 ```
 
+Module kinds:
+`linear conv1d conv2d conv_transpose2d embedding layer_norm
+batch_norm group_norm dropout relu sigmoid tanh gelu leaky_relu softmax
+max_pool2d avg_pool2d flatten sequential`;
+optimizers: `sgd adam adamw
+rmsprop` (see `torch nn <kind> --help`-style usage
+errors for each). `torch nn train|eval $m` switches dropout/batch_norm behavior.
+
 Losses are ordinary ops: `torch mse_loss $pred $target | torch backward` (also
 `cross_entropy`, `l1_loss`, `binary_cross_entropy_with_logits`, … — see
 `torch ops` under `loss`).

@@ -133,4 +133,6 @@ or honestly excluded.
   BOTH acceptance scripts train successfully from plain zsh — the issue's goal
   demonstrated)
 - [Experiment 5: The module sweep — conv, norms, dropout, embedding, pools](05-module-sweep.md)
-  — **Designed**
+  — **Pass** (13 kinds, 13/13 goldens first-run; one recorded ULP exclusion
+  (group_norm C-API vs Python dispatch); train/eval mode; training regression
+  unchanged)

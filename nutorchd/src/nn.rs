@@ -20,6 +20,79 @@ pub enum NnModule {
     Sequential {
         children: Vec<NnModule>,
     },
+    Conv1d {
+        weight: Tensor,
+        bias: Option<Tensor>,
+        stride: i64,
+        padding: i64,
+        dilation: i64,
+        groups: i64,
+    },
+    Conv2d {
+        weight: Tensor,
+        bias: Option<Tensor>,
+        stride: i64,
+        padding: i64,
+        dilation: i64,
+        groups: i64,
+    },
+    ConvTranspose2d {
+        weight: Tensor,
+        bias: Option<Tensor>,
+        stride: i64,
+        padding: i64,
+        output_padding: i64,
+        groups: i64,
+        dilation: i64,
+    },
+    Embedding {
+        weight: Tensor,
+    },
+    LayerNorm {
+        shape: Vec<i64>,
+        weight: Tensor,
+        bias: Tensor,
+        eps: f64,
+    },
+    BatchNorm {
+        weight: Tensor,
+        bias: Tensor,
+        running_mean: Tensor,
+        running_var: Tensor,
+        eps: f64,
+        momentum: f64,
+        training: bool,
+    },
+    GroupNorm {
+        num_groups: i64,
+        weight: Tensor,
+        bias: Tensor,
+        eps: f64,
+    },
+    Dropout {
+        p: f64,
+        training: bool,
+    },
+    LeakyRelu {
+        slope: f64,
+    },
+    Softmax {
+        dim: i64,
+    },
+    MaxPool2d {
+        kernel: i64,
+        stride: i64,
+        padding: i64,
+    },
+    AvgPool2d {
+        kernel: i64,
+        stride: i64,
+        padding: i64,
+    },
+    Flatten {
+        start_dim: i64,
+        end_dim: i64,
+    },
 }
 
 impl NnModule {
@@ -31,6 +104,43 @@ impl NnModule {
             NnModule::Tanh => "tanh",
             NnModule::Gelu => "gelu",
             NnModule::Sequential { .. } => "sequential",
+            NnModule::Conv1d { .. } => "conv1d",
+            NnModule::Conv2d { .. } => "conv2d",
+            NnModule::ConvTranspose2d { .. } => "conv_transpose2d",
+            NnModule::Embedding { .. } => "embedding",
+            NnModule::LayerNorm { .. } => "layer_norm",
+            NnModule::BatchNorm { .. } => "batch_norm",
+            NnModule::GroupNorm { .. } => "group_norm",
+            NnModule::Dropout { .. } => "dropout",
+            NnModule::LeakyRelu { .. } => "leaky_relu",
+            NnModule::Softmax { .. } => "softmax",
+            NnModule::MaxPool2d { .. } => "max_pool2d",
+            NnModule::AvgPool2d { .. } => "avg_pool2d",
+            NnModule::Flatten { .. } => "flatten",
+        }
+    }
+
+    /// Train/eval mode (issue 0009 exp 5): meaningful for Dropout and
+    /// BatchNorm; recurses through Sequential like PyTorch's .train().
+    pub fn set_training(&mut self, training: bool) {
+        match self {
+            NnModule::Dropout { training: t, .. } => *t = training,
+            NnModule::BatchNorm { training: t, .. } => *t = training,
+            NnModule::Sequential { children } => {
+                for child in children {
+                    child.set_training(training);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    pub fn is_training(&self) -> bool {
+        match self {
+            NnModule::Dropout { training, .. } => *training,
+            NnModule::BatchNorm { training, .. } => *training,
+            NnModule::Sequential { children } => children.iter().any(|c| c.is_training()),
+            _ => true,
         }
     }
 
@@ -50,6 +160,166 @@ impl NnModule {
                 }
                 Ok(current)
             }
+            NnModule::Conv1d {
+                weight,
+                bias,
+                stride,
+                padding,
+                dilation,
+                groups,
+            } => input
+                .f_conv1d(
+                    weight,
+                    bias.as_ref(),
+                    [*stride],
+                    [*padding],
+                    [*dilation],
+                    *groups,
+                )
+                .map_err(tch_error),
+            NnModule::Conv2d {
+                weight,
+                bias,
+                stride,
+                padding,
+                dilation,
+                groups,
+            } => input
+                .f_conv2d(
+                    weight,
+                    bias.as_ref(),
+                    [*stride, *stride],
+                    [*padding, *padding],
+                    [*dilation, *dilation],
+                    *groups,
+                )
+                .map_err(tch_error),
+            NnModule::ConvTranspose2d {
+                weight,
+                bias,
+                stride,
+                padding,
+                output_padding,
+                groups,
+                dilation,
+            } => input
+                // NOTE: groups BEFORE dilation here — the reverse of conv2d.
+                .f_conv_transpose2d(
+                    weight,
+                    bias.as_ref(),
+                    [*stride, *stride],
+                    [*padding, *padding],
+                    [*output_padding, *output_padding],
+                    *groups,
+                    [*dilation, *dilation],
+                )
+                .map_err(tch_error),
+            NnModule::Embedding { weight } => {
+                // f_embedding is weight-first; padding_idx -1 == None.
+                Tensor::f_embedding(weight, input, -1, false, false).map_err(tch_error)
+            }
+            NnModule::LayerNorm {
+                shape,
+                weight,
+                bias,
+                eps,
+            } => input
+                .f_layer_norm(&shape[..], Some(weight), Some(bias), *eps, false)
+                .map_err(tch_error),
+            NnModule::BatchNorm {
+                weight,
+                bias,
+                running_mean,
+                running_var,
+                eps,
+                momentum,
+                training,
+            } => input
+                // Running stats mutate IN PLACE during train-mode forward
+                // (libtorch interior mutability) — &self survives.
+                .f_batch_norm(
+                    Some(weight),
+                    Some(bias),
+                    Some(running_mean),
+                    Some(running_var),
+                    *training,
+                    *momentum,
+                    *eps,
+                    false,
+                )
+                .map_err(tch_error),
+            NnModule::GroupNorm {
+                num_groups,
+                weight,
+                bias,
+                eps,
+            } => input
+                // cudnn_enabled=true matches F.group_norm's passthrough of
+                // torch.backends.cudnn.enabled (1-ULP kernel-path difference
+                // otherwise — found by the golden).
+                .f_group_norm(*num_groups, Some(weight), Some(bias), *eps, true)
+                .map_err(tch_error),
+            NnModule::Dropout { p, training } => {
+                if !training || *p == 0.0 {
+                    return Ok(input.shallow_clone());
+                }
+                if *p == 1.0 {
+                    // Special-cased: the 1/(1-p) scaling would be inf×0=NaN.
+                    return input.f_zeros_like().map_err(tch_error);
+                }
+                // Own-mask convention: tch's manual_seed cannot reach the
+                // MPS generator, so the mask draws on the seeded CPU
+                // generator (deterministic) and transfers.
+                let mask = Tensor::f_rand(&input.size(), (tch::Kind::Float, tch::Device::Cpu))
+                    .and_then(|r| r.f_ge(*p))
+                    .and_then(|m| m.f_to_kind(tch::Kind::Float))
+                    .and_then(|m| m.f_mul_scalar(1.0 / (1.0 - *p)))
+                    .and_then(|m| m.f_to_device(input.device()))
+                    .map_err(tch_error)?;
+                input.f_mul(&mask).map_err(tch_error)
+            }
+            NnModule::LeakyRelu { slope } => {
+                // tch's f_leaky_relu takes NO slope (0.01 baked in) — a
+                // non-default slope would be silently ignored. Computed
+                // manually: max(0,x) + slope*min(0,x).
+                let positive = input.f_clamp_min(0.0).map_err(tch_error)?;
+                let negative = input
+                    .f_clamp_max(0.0)
+                    .and_then(|n| n.f_mul_scalar(*slope))
+                    .map_err(tch_error)?;
+                positive.f_add(&negative).map_err(tch_error)
+            }
+            NnModule::Softmax { dim } => input.f_softmax(*dim, tch::Kind::Float).map_err(tch_error),
+            NnModule::MaxPool2d {
+                kernel,
+                stride,
+                padding,
+            } => input
+                .f_max_pool2d(
+                    [*kernel, *kernel],
+                    [*stride, *stride],
+                    [*padding, *padding],
+                    [1, 1],
+                    false,
+                )
+                .map_err(tch_error),
+            NnModule::AvgPool2d {
+                kernel,
+                stride,
+                padding,
+            } => input
+                .f_avg_pool2d(
+                    [*kernel, *kernel],
+                    [*stride, *stride],
+                    [*padding, *padding],
+                    false,
+                    true,
+                    None,
+                )
+                .map_err(tch_error),
+            NnModule::Flatten { start_dim, end_dim } => {
+                input.f_flatten(*start_dim, *end_dim).map_err(tch_error)
+            }
         }
     }
 
@@ -62,11 +332,23 @@ impl NnModule {
 
     fn collect_parameters<'a>(&'a self, params: &mut Vec<&'a Tensor>) {
         match self {
-            NnModule::Linear { weight, bias } => {
+            NnModule::Linear { weight, bias }
+            | NnModule::Conv1d { weight, bias, .. }
+            | NnModule::Conv2d { weight, bias, .. }
+            | NnModule::ConvTranspose2d { weight, bias, .. } => {
                 params.push(weight);
                 if let Some(bias) = bias {
                     params.push(bias);
                 }
+            }
+            NnModule::Embedding { weight } => params.push(weight),
+            // Norm weight/bias are parameters; running stats are BUFFERS
+            // (not optimized), as in PyTorch.
+            NnModule::LayerNorm { weight, bias, .. }
+            | NnModule::BatchNorm { weight, bias, .. }
+            | NnModule::GroupNorm { weight, bias, .. } => {
+                params.push(weight);
+                params.push(bias);
             }
             NnModule::Sequential { children } => {
                 for child in children {
@@ -111,6 +393,12 @@ impl NnModule {
                 lines.push(format!("children: {}", kinds.join(" -> ")));
             }
             _ => {}
+        }
+        if matches!(
+            self,
+            NnModule::Dropout { .. } | NnModule::BatchNorm { .. } | NnModule::Sequential { .. }
+        ) {
+            lines.push(format!("training: {}", self.is_training()));
         }
         lines
     }

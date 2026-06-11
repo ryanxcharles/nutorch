@@ -150,3 +150,66 @@ verified every other tch signature, MPS support for the whole sweep including
 embedding BACKWARD, the real in-place running-stats mutation batch_norm relies
 on, the PyTorch defaults (Flatten 1/−1, train-by-default, softmax dim), the
 MNIST-pipeline arithmetic, and the floor.
+
+## Result
+
+**Result:** Pass
+
+Thirteen new module kinds landed on the loom; the table of modules now covers
+the issue's scope minus the recorded lstm/gru exclusion.
+
+- **Goldens: 13/13 module cases first-run** (255 total, floor 253; byte-stable
+  at sha256 `7a49f4cb…`): conv1d/conv2d (stride/padding
+  variants)/conv_transpose2d, embedding (int64), layer_norm, batch_norm TRAIN
+  and EVAL, leaky_relu with a NON-default slope (proving the manual
+  `max(0,x)+slope·min(0,x)` wiring the design review forced), softmax, both
+  pools, flatten, dropout-eval identity.
+- **One golden exclusion, recorded with evidence**: `group_norm` — the C-API
+  entry (tch's `atg_group_norm`) and Python's `torch.group_norm` produce results
+  **1 ULP apart on MPS in this libtorch build** (probed exhaustively:
+  plain/grad/no-affine identical within each side, the two sides differing
+  consistently — same composite, different dispatch path). Internal consistency
+  is pinned by a Rust test (module forward ≡ tch's direct call); the exclusion
+  note lives in the generator.
+- **Unit tests** (76 daemon tests): the dropout train-mode quartet (seeded
+  determinism, zero-fraction ≈ p, 1/(1−p) scaling, gradient flow) plus the
+  p=1-all-zeros-no-NaN and p=0-identity edges and range rejection; batch_norm
+  running stats observably evolving (eval-before ≠ eval-after a train forward);
+  mode propagation through sequential (info reports it; eval dropout inside is
+  identity); conv weight shape mismatch errors; group_norm internal consistency.
+- **Live**: the MNIST-shaped pipeline
+  conv2d(1,4,3)→relu→max_pool2d(2)→flatten→linear(36,10) on [1,1,8,8] → [1,10]
+  with exactly 410 parameters; dropout train (zeros + 2.0 scaling) vs eval
+  (identity) with `nn info` reporting the mode; embedding int64 lookup;
+  batch_norm stats moving; **and the committed `train-classify.sh` still passes
+  unchanged** — the sweep disturbed nothing.
+- **Hygiene**: build 0 warnings; fmt/dprint clean; `v1/` untouched. (One
+  result-review finding fixed before commit: the conv arms computed
+  `channels / groups` unvalidated — `--groups 0` panicked the connection thread
+  with a divide-by-zero, and non-divisible groups silently truncated the weight
+  shape. Both now `bad_argument` with named values, mirroring group_norm's
+  existing validation; three new unit-test cases pin it, including
+  conv_transpose validating OUT channels.)
+
+## Conclusion
+
+The module surface is complete per the issue's scope: 19 kinds, all golden- or
+consistency-verified, with train/eval mode, the own-mask dropout convention (the
+issue's design question 5, answered), and one honestly-recorded ULP exclusion.
+What remains: save/load (the last strand) and the close.
+
+## Result Review
+
+**Reviewer:** `adversarial-reviewer` subagent (fresh context, read-only),
+reviewing the pre-commit working tree. **First pass: CHANGES REQUIRED** — 1
+Required, and a daemon-crasher: the conv arms divided by `groups` unvalidated,
+so `--groups 0` panicked the connection thread (reproduced live in the daemon
+log) and non-divisible groups silently built a truncated weight. Fixed with
+group_norm-style validation (`groups >= 1`, divisibility on in_channels —
+out_channels for conv_transpose), three new unit-test cases, and the Result
+corrected to disclose. Everything else held under attack: all five design-review
+mandates verified in code (manual leaky_relu at slope 0.2; the dropout p-edges;
+groups-before- dilation; padding_idx −1); the group_norm exclusion independently
+reproduced and judged correct ("not an error in our arm"); goldens byte-stable
+with two spot-checks against fresh Python; the MNIST pipeline,
+dropout/batch_norm mode behavior, and train-classify.sh all re-run successfully.

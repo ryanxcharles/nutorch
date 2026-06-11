@@ -160,6 +160,32 @@ impl Registry {
         self.insert_object(Object::Module(module))
     }
 
+    pub fn get_module_mut(&mut self, handle: &str) -> Result<&mut crate::nn::NnModule, Lookup> {
+        let (kind, id) = parse_handle(handle)?;
+        let entry = self
+            .entries
+            .get_mut(id)
+            .ok_or_else(|| Lookup::Unknown(handle.to_string()))?;
+        let actual = entry.object.kind();
+        if kind != actual || kind != HandleKind::Module {
+            let expected = if kind != actual {
+                kind
+            } else {
+                HandleKind::Module
+            };
+            return Err(Lookup::WrongKind {
+                handle: handle.to_string(),
+                actual,
+                expected,
+            });
+        }
+        entry.touched = Instant::now();
+        match &mut entry.object {
+            Object::Module(module) => Ok(module),
+            _ => unreachable!("kind-checked"),
+        }
+    }
+
     pub fn insert_optimizer(&mut self, optimizer: crate::nn::Optimizer) -> String {
         self.insert_object(Object::Optimizer(optimizer))
     }

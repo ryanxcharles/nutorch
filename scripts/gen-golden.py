@@ -644,7 +644,133 @@ optim_case("opt_adam_coupled_wd", "adam",
 optim_case("opt_adamw", "adamw", {"lr": 0.01, "weight_decay": 0.01})
 optim_case("opt_rmsprop", "rmsprop", {"lr": 0.01, "momentum": 0.5})
 
+# --- module sweep goldens (issue 0009 exp 5) vs torch.nn.functional ---
+# Generic case: construct kind with explicit weights (when parameterized),
+# forward a fixed input, compare exactly. Eval-mode where state matters.
+def nn_module_case(name, kind, cargs, input_data, compute, weight=None, bias=None,
+                   input_dtype="float32", eval_mode=False):
+    cases.append({
+        "name": name,
+        "nn_module_forward": kind,
+        "cargs": cargs,
+        "input": {"data": input_data, "dtype": input_dtype},
+        "weight": weight,
+        "bias": bias,
+        "eval_mode": eval_mode,
+        "expect_output": compute().cpu().tolist(),
+    })
+
+X4 = [[[[1.0, 2.0, 0.5, -1.0], [0.0, 1.5, -0.5, 2.0],
+        [1.0, -2.0, 0.0, 1.0], [0.5, 0.5, 1.0, -1.5]]]]   # [1,1,4,4]
+CW = [[[[1.0, 0.0], [0.0, -1.0]]], [[[0.5, 0.5], [0.5, 0.5]]]]  # [2,1,2,2]
+CB = [0.1, -0.1]
+def conv2d_expected():
+    x = torch.tensor(X4, dtype=torch.float32, device=DEV)
+    w = torch.tensor(CW, dtype=torch.float32, device=DEV)
+    b = torch.tensor(CB, dtype=torch.float32, device=DEV)
+    return torch.nn.functional.conv2d(x, w, b, stride=1, padding=1)
+nn_module_case("nnm_conv2d", "conv2d",
+               {"in_channels": 1, "out_channels": 2, "kernel_size": 2, "padding": 1},
+               X4, conv2d_expected, weight=CW, bias=CB)
+
+C1W = [[[1.0, -1.0]], [[0.5, 0.5]]]  # [2,1,2]
+def conv1d_expected():
+    x = torch.tensor([[[1.0, 2.0, 3.0, 4.0]]], dtype=torch.float32, device=DEV)
+    w = torch.tensor(C1W, dtype=torch.float32, device=DEV)
+    return torch.nn.functional.conv1d(x, w, None, stride=2)
+nn_module_case("nnm_conv1d", "conv1d",
+               {"in_channels": 1, "out_channels": 2, "kernel_size": 2,
+                "stride": 2, "no_bias": True},
+               [[[1.0, 2.0, 3.0, 4.0]]], conv1d_expected, weight=C1W)
+
+CTW = [[[[1.0, 0.5], [0.5, 1.0]]]]  # transpose weight [in=1, out=1, 2, 2]
+def convt_expected():
+    x = torch.tensor([[[[1.0, 2.0], [3.0, 4.0]]]], dtype=torch.float32, device=DEV)
+    w = torch.tensor(CTW, dtype=torch.float32, device=DEV)
+    return torch.nn.functional.conv_transpose2d(x, w, None, stride=2)
+nn_module_case("nnm_conv_transpose2d", "conv_transpose2d",
+               {"in_channels": 1, "out_channels": 1, "kernel_size": 2,
+                "stride": 2, "no_bias": True},
+               [[[[1.0, 2.0], [3.0, 4.0]]]], convt_expected, weight=CTW)
+
+EW = [[0.0, 1.0], [2.0, 3.0], [4.0, 5.0]]  # [3,2]
+def embedding_expected():
+    w = torch.tensor(EW, dtype=torch.float32, device=DEV)
+    idx = torch.tensor([2, 0, 1], dtype=torch.int64, device=DEV)
+    return torch.nn.functional.embedding(idx, w)
+nn_module_case("nnm_embedding", "embedding",
+               {"num_embeddings": 3, "embedding_dim": 2},
+               [2, 0, 1], embedding_expected, weight=EW, input_dtype="int64")
+
+LNW = [2.0, 0.5, 1.0]
+LNB = [0.1, 0.2, -0.1]
+def layer_norm_expected():
+    x = torch.tensor([[1.0, 2.0, 3.0], [4.0, -1.0, 0.0]], dtype=torch.float32, device=DEV)
+    w = torch.tensor(LNW, dtype=torch.float32, device=DEV)
+    b = torch.tensor(LNB, dtype=torch.float32, device=DEV)
+    return torch.nn.functional.layer_norm(x, [3], w, b)
+nn_module_case("nnm_layer_norm", "layer_norm",
+               {"normalized_shape": [3]},
+               [[1.0, 2.0, 3.0], [4.0, -1.0, 0.0]], layer_norm_expected,
+               weight=LNW, bias=LNB)
+
+BNX = [[1.0, -1.0], [3.0, 0.5], [-2.0, 2.0]]   # [3,2]
+def batch_norm_train_expected():
+    x = torch.tensor(BNX, dtype=torch.float32, device=DEV)
+    w = torch.ones(2, device=DEV); b = torch.zeros(2, device=DEV)
+    rm = torch.zeros(2, device=DEV); rv = torch.ones(2, device=DEV)
+    return torch.nn.functional.batch_norm(x, rm, rv, w, b, training=True, momentum=0.1)
+nn_module_case("nnm_batch_norm_train", "batch_norm", {"num_features": 2},
+               BNX, batch_norm_train_expected)
+def batch_norm_eval_expected():
+    x = torch.tensor(BNX, dtype=torch.float32, device=DEV)
+    w = torch.ones(2, device=DEV); b = torch.zeros(2, device=DEV)
+    rm = torch.zeros(2, device=DEV); rv = torch.ones(2, device=DEV)
+    return torch.nn.functional.batch_norm(x, rm, rv, w, b, training=False)
+nn_module_case("nnm_batch_norm_eval", "batch_norm", {"num_features": 2},
+               BNX, batch_norm_eval_expected, eval_mode=True)
+
+# group_norm: EXCLUDED from exact goldens (recorded). The C-API entry
+# (tch's atg_group_norm) and Python's torch.group_norm produce results
+# 1 ULP apart on MPS in this libtorch build — same composite, different
+# dispatch path; verified with identical plain/grad/no-affine inputs on
+# both sides. Daemon-side determinism + internal consistency are pinned
+# by a Rust unit test instead.
+
+def leaky_expected():
+    x = torch.tensor([-2.0, -0.5, 0.0, 1.5], dtype=torch.float32, device=DEV)
+    return torch.nn.functional.leaky_relu(x, negative_slope=0.2)
+nn_module_case("nnm_leaky_relu", "leaky_relu", {"negative_slope": 0.2},
+               [-2.0, -0.5, 0.0, 1.5], leaky_expected)
+
+def softmax_expected():
+    x = torch.tensor([[1.0, 2.0, 3.0]], dtype=torch.float32, device=DEV)
+    return torch.softmax(x, dim=1)
+nn_module_case("nnm_softmax", "softmax", {"dim": 1},
+               [[1.0, 2.0, 3.0]], softmax_expected)
+
+def maxpool_expected():
+    x = torch.tensor(X4, dtype=torch.float32, device=DEV)
+    return torch.nn.functional.max_pool2d(x, 2)
+nn_module_case("nnm_max_pool2d", "max_pool2d", {"kernel_size": 2}, X4, maxpool_expected)
+
+def avgpool_expected():
+    x = torch.tensor(X4, dtype=torch.float32, device=DEV)
+    return torch.nn.functional.avg_pool2d(x, 2)
+nn_module_case("nnm_avg_pool2d", "avg_pool2d", {"kernel_size": 2}, X4, avgpool_expected)
+
+def flatten_expected():
+    x = torch.tensor(X4, dtype=torch.float32, device=DEV)
+    return torch.flatten(x, 1, -1)
+nn_module_case("nnm_flatten", "flatten", {}, X4, flatten_expected)
+
+def dropout_eval_expected():
+    return torch.tensor([1.0, -2.0, 3.0], dtype=torch.float32, device=DEV)
+nn_module_case("nnm_dropout_eval", "dropout", {"p": 0.5},
+               [1.0, -2.0, 3.0], dropout_eval_expected, eval_mode=True)
+
 out = pathlib.Path(__file__).resolve().parent.parent / "nutorchd" / "tests" / "golden.json"
+
 
 
 

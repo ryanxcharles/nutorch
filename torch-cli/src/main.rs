@@ -483,6 +483,58 @@ fn build_bespoke_request(args: &RawArgs) -> Result<serde_json::Value, String> {
     }
 }
 
+/// Generic kind builder: positional Ints by name, then flags (presence
+/// flags stay bool; handle-bearing flags stay strings; numbers parse).
+fn build_kind_request(
+    kind: &str,
+    args: &RawArgs,
+    positionals: &[&str],
+    _reserved: &[&str],
+) -> Result<serde_json::Value, String> {
+    let mut nn_args = serde_json::Map::new();
+    for (index, name) in positionals.iter().enumerate() {
+        let value = args
+            .positionals
+            .get(index + 1)
+            .ok_or(format!("nn {kind}: missing <{name}>"))?
+            .parse::<i64>()
+            .map_err(|_| format!("nn {kind}: {name} must be an integer"))?;
+        nn_args.insert(name.to_string(), value.into());
+    }
+    collect_kind_flags(kind, args, &mut nn_args)?;
+    Ok(serde_json::json!({ "op": "nn", "kind": kind, "args": nn_args }))
+}
+
+fn collect_kind_flags(
+    kind: &str,
+    args: &RawArgs,
+    nn_args: &mut serde_json::Map<String, serde_json::Value>,
+) -> Result<(), String> {
+    for (name, value) in &args.flags {
+        let key = name.replace('-', "_");
+        match (key.as_str(), value) {
+            ("no_bias", _) => {
+                nn_args.insert("no_bias".into(), true.into());
+            }
+            ("weight" | "bias_tensor", Some(handle)) => {
+                nn_args.insert(key, handle.clone().into());
+            }
+            (_, Some(text)) => {
+                // Numbers go as numbers (ints stay ints for Int args).
+                if let Ok(i) = text.parse::<i64>() {
+                    nn_args.insert(key, i.into());
+                } else if let Ok(f) = text.parse::<f64>() {
+                    nn_args.insert(key, serde_json::json!(f));
+                } else {
+                    return Err(format!("nn {kind}: --{name} must be a number"));
+                }
+            }
+            (_, None) => return Err(format!("nn {kind}: --{name} needs a value")),
+        }
+    }
+    Ok(())
+}
+
 /// `torch nn <kind> [args…]`: the module construction subcommand
 /// (issue 0009). Kind specs are a small client-side match until the
 /// module sweep needs a declarative table.
@@ -521,6 +573,42 @@ fn build_nn_request(args: &RawArgs) -> Result<serde_json::Value, String> {
         }
         "relu" | "sigmoid" | "tanh" | "gelu" => {
             Ok(serde_json::json!({ "op": "nn", "kind": kind, "args": {} }))
+        }
+        // Data-driven kinds: (positional int args…, then flags parse by
+        // name with hyphen→underscore tolerance; string flags carry handles).
+        "conv1d" | "conv2d" | "conv_transpose2d" => build_kind_request(
+            kind,
+            args,
+            &["in_channels", "out_channels", "kernel_size"],
+            &[],
+        ),
+        "embedding" => build_kind_request(kind, args, &["num_embeddings", "embedding_dim"], &[]),
+        "batch_norm" => build_kind_request(kind, args, &["num_features"], &[]),
+        "group_norm" => build_kind_request(kind, args, &["num_groups", "num_channels"], &[]),
+        "softmax" => build_kind_request(kind, args, &["dim"], &[]),
+        "max_pool2d" | "avg_pool2d" => build_kind_request(kind, args, &["kernel_size"], &[]),
+        "dropout" | "leaky_relu" | "flatten" => build_kind_request(kind, args, &[], &[]),
+        "layer_norm" => {
+            let shape_text = args
+                .positionals
+                .get(1)
+                .ok_or("usage: torch nn layer_norm '[shape]' [--eps E]")?;
+            let shape: serde_json::Value = serde_json::from_str(shape_text)
+                .map_err(|_| "nn layer_norm: shape must be a JSON int list".to_string())?;
+            let mut nn_args = serde_json::Map::new();
+            nn_args.insert("normalized_shape".into(), shape);
+            collect_kind_flags(kind, args, &mut nn_args)?;
+            Ok(serde_json::json!({ "op": "nn", "kind": "layer_norm", "args": nn_args }))
+        }
+        "train" | "eval" => {
+            let module = args
+                .positionals
+                .get(1)
+                .cloned()
+                .ok_or(format!("usage: torch nn {kind} <nn://module>"))?;
+            Ok(serde_json::json!({
+                "op": "nn_mode", "module": module, "train": kind == "train",
+            }))
         }
         "sequential" => {
             let mut children: Vec<String> = args.positionals[1..].to_vec();
@@ -825,7 +913,7 @@ fn run() -> Result<(), String> {
         // zero_grad/set_lr are loop verbs: quiet on success.
         if matches!(
             args.positionals.first().map(String::as_str),
-            Some("zero_grad") | Some("set_lr")
+            Some("zero_grad") | Some("set_lr") | Some("train") | Some("eval")
         ) {
             return Ok(());
         }

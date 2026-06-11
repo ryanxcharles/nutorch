@@ -33,7 +33,8 @@ pub fn parse_request(line: &str) -> Result<Request, Response> {
         .to_string();
     match name.as_str() {
         "tensor" | "value" | "free" | "tensors" | "nn" | "forward" | "nn_parameters" | "step"
-        | "nn_zero_grad" | "nn_set_lr" | "nn_info" | "status" | "set_ttl" | "shutdown" => {
+        | "nn_zero_grad" | "nn_set_lr" | "nn_mode" | "nn_info" | "status" | "set_ttl"
+        | "shutdown" => {
             let bespoke: Bespoke = serde_json::from_value(raw)
                 .map_err(|e| Response::error("bad_request", format!("bad request: {e}")))?;
             Ok(Request::Bespoke(bespoke))
@@ -342,6 +343,19 @@ pub fn handle_request(
                     Err(lookup) => (Response::error(lookup.code(), lookup.message()), false),
                 }
             }
+            Bespoke::NnMode { module, train } => {
+                lifecycle.lock().unwrap().touch();
+                match registry.get_module_mut(&module) {
+                    Ok(m) => {
+                        m.set_training(train);
+                        (
+                            Response::value(serde_json::json!({ "training": train })),
+                            false,
+                        )
+                    }
+                    Err(lookup) => (Response::error(lookup.code(), lookup.message()), false),
+                }
+            }
             Bespoke::Status => {
                 let state = lifecycle.lock().unwrap();
                 (
@@ -564,6 +578,248 @@ fn build_module(
             };
             Ok(NnModule::Linear { weight, bias })
         }
+        "conv1d" | "conv2d" | "conv_transpose2d" => {
+            let req = |name: &str| -> Result<i64, (&'static str, String)> {
+                int_arg(name).ok_or((
+                    "bad_argument",
+                    format!("nn {kind}: usage: torch nn {kind} <in_channels> <out_channels> <kernel_size> [flags]"),
+                ))
+            };
+            let (in_ch, out_ch, k) = (req("in_channels")?, req("out_channels")?, req("kernel_size")?);
+            if in_ch < 1 || out_ch < 1 || k < 1 {
+                return Err((
+                    "bad_argument",
+                    format!("nn {kind}: channels and kernel_size must be >= 1"),
+                ));
+            }
+            let stride = int_arg("stride").unwrap_or(1);
+            let padding = int_arg("padding").unwrap_or(0);
+            let dilation = int_arg("dilation").unwrap_or(1);
+            let groups = int_arg("groups").unwrap_or(1);
+            // Validate BEFORE the division below: groups = 0 would panic
+            // the connection thread (divide by zero), and non-divisible
+            // channels would silently truncate the weight shape.
+            if groups < 1 {
+                return Err((
+                    "bad_argument",
+                    format!("nn {kind}: groups must be a positive integer, got {groups}"),
+                ));
+            }
+            let (divided, label) = if kind == "conv_transpose2d" {
+                (out_ch, "out_channels")
+            } else {
+                (in_ch, "in_channels")
+            };
+            if divided % groups != 0 {
+                return Err((
+                    "bad_argument",
+                    format!("nn {kind}: {label} ({divided}) must be divisible by groups ({groups})"),
+                ));
+            }
+            let no_bias = bool_arg("no_bias");
+            if no_bias && str_arg("bias_tensor").is_some() {
+                return Err((
+                    "bad_argument",
+                    format!("nn {kind}: --bias-tensor contradicts --no-bias"),
+                ));
+            }
+            // Weight shapes: conv = [out, in/groups, k(,k)];
+            // conv_transpose = [in, out/groups, k, k].
+            let weight_shape: Vec<i64> = match kind {
+                "conv1d" => vec![out_ch, in_ch / groups, k],
+                "conv2d" => vec![out_ch, in_ch / groups, k, k],
+                _ => vec![in_ch, out_ch / groups, k, k],
+            };
+            let fan_in = (in_ch / groups) * if kind == "conv1d" { k } else { k * k };
+            let weight = match str_arg("weight") {
+                Some(handle) => copy_module_param(registry, handle, &weight_shape, "weight")?,
+                None => init_linear_param(&weight_shape, fan_in)?,
+            };
+            let bias = if no_bias {
+                None
+            } else {
+                Some(match str_arg("bias_tensor") {
+                    Some(handle) => copy_module_param(registry, handle, &[out_ch], "bias")?,
+                    None => init_linear_param(&[out_ch], fan_in)?,
+                })
+            };
+            Ok(match kind {
+                "conv1d" => NnModule::Conv1d {
+                    weight,
+                    bias,
+                    stride,
+                    padding,
+                    dilation,
+                    groups,
+                },
+                "conv2d" => NnModule::Conv2d {
+                    weight,
+                    bias,
+                    stride,
+                    padding,
+                    dilation,
+                    groups,
+                },
+                _ => NnModule::ConvTranspose2d {
+                    weight,
+                    bias,
+                    stride,
+                    padding,
+                    output_padding: int_arg("output_padding").unwrap_or(0),
+                    groups,
+                    dilation,
+                },
+            })
+        }
+        "embedding" => {
+            let num = int_arg("num_embeddings").ok_or((
+                "bad_argument",
+                "nn embedding: usage: torch nn embedding <num_embeddings> <embedding_dim>"
+                    .to_string(),
+            ))?;
+            let dim = int_arg("embedding_dim").ok_or((
+                "bad_argument",
+                "nn embedding: missing embedding_dim".to_string(),
+            ))?;
+            let weight = match str_arg("weight") {
+                Some(handle) => copy_module_param(registry, handle, &[num, dim], "weight")?,
+                None => {
+                    // PyTorch init: N(0, 1) — seeded CPU randn convention.
+                    let t = Tensor::f_randn([num, dim], (Kind::Float, Device::Cpu))
+                        .and_then(|t| t.f_to_device(Device::Mps))
+                        .map_err(|e| tch("nn", e))?;
+                    t.set_requires_grad(true)
+                }
+            };
+            Ok(NnModule::Embedding { weight })
+        }
+        "layer_norm" => {
+            let shape = match args.get("normalized_shape") {
+                Some(serde_json::Value::Array(dims)) => dims
+                    .iter()
+                    .map(|d| {
+                        d.as_i64().ok_or((
+                            "bad_argument",
+                            "nn layer_norm: normalized_shape must be integers".to_string(),
+                        ))
+                    })
+                    .collect::<Result<Vec<i64>, _>>()?,
+                _ => {
+                    return Err((
+                        "bad_argument",
+                        "nn layer_norm: usage: torch nn layer_norm '[shape]'".to_string(),
+                    ))
+                }
+            };
+            let eps = float_module_arg(args, "eps", 1e-5);
+            let weight = match str_arg("weight") {
+                Some(handle) => copy_module_param(registry, handle, &shape, "weight")?,
+                None => ones_param(&shape)?,
+            };
+            let bias = match str_arg("bias_tensor") {
+                Some(handle) => copy_module_param(registry, handle, &shape, "bias")?,
+                None => zeros_param(&shape)?,
+            };
+            Ok(NnModule::LayerNorm {
+                shape,
+                weight,
+                bias,
+                eps,
+            })
+        }
+        "batch_norm" => {
+            let features = int_arg("num_features").ok_or((
+                "bad_argument",
+                "nn batch_norm: usage: torch nn batch_norm <num_features>".to_string(),
+            ))?;
+            let eps = float_module_arg(args, "eps", 1e-5);
+            let momentum = float_module_arg(args, "momentum", 0.1);
+            let weight = ones_param(&[features])?;
+            let bias = zeros_param(&[features])?;
+            // Buffers, not parameters: no requires_grad.
+            let running_mean = Tensor::f_zeros([features], (Kind::Float, Device::Mps))
+                .map_err(|e| tch("nn", e))?;
+            let running_var = Tensor::f_ones([features], (Kind::Float, Device::Mps))
+                .map_err(|e| tch("nn", e))?;
+            Ok(NnModule::BatchNorm {
+                weight,
+                bias,
+                running_mean,
+                running_var,
+                eps,
+                momentum,
+                training: true,
+            })
+        }
+        "group_norm" => {
+            let groups = int_arg("num_groups").ok_or((
+                "bad_argument",
+                "nn group_norm: usage: torch nn group_norm <num_groups> <num_channels>"
+                    .to_string(),
+            ))?;
+            let channels = int_arg("num_channels").ok_or((
+                "bad_argument",
+                "nn group_norm: missing num_channels".to_string(),
+            ))?;
+            if groups < 1 || channels < 1 || channels % groups != 0 {
+                return Err((
+                    "bad_argument",
+                    format!("nn group_norm: num_channels ({channels}) must be divisible by num_groups ({groups})"),
+                ));
+            }
+            Ok(NnModule::GroupNorm {
+                num_groups: groups,
+                weight: ones_param(&[channels])?,
+                bias: zeros_param(&[channels])?,
+                eps: float_module_arg(args, "eps", 1e-5),
+            })
+        }
+        "dropout" => {
+            let p = float_module_arg(args, "p", 0.5);
+            if !(0.0..=1.0).contains(&p) {
+                return Err((
+                    "bad_argument",
+                    format!("nn dropout: p must be in [0, 1], got {p}"),
+                ));
+            }
+            Ok(NnModule::Dropout { p, training: true })
+        }
+        "leaky_relu" => Ok(NnModule::LeakyRelu {
+            slope: float_module_arg(args, "negative_slope", 0.01),
+        }),
+        "softmax" => {
+            let dim = int_arg("dim").ok_or((
+                "bad_argument",
+                "nn softmax: usage: torch nn softmax <dim>".to_string(),
+            ))?;
+            Ok(NnModule::Softmax { dim })
+        }
+        "max_pool2d" | "avg_pool2d" => {
+            let kernel = int_arg("kernel_size").ok_or((
+                "bad_argument",
+                format!("nn {kind}: usage: torch nn {kind} <kernel_size> [--stride S --padding P]"),
+            ))?;
+            let stride = int_arg("stride").unwrap_or(kernel);
+            let padding = int_arg("padding").unwrap_or(0);
+            Ok(if kind == "max_pool2d" {
+                NnModule::MaxPool2d {
+                    kernel,
+                    stride,
+                    padding,
+                }
+            } else {
+                NnModule::AvgPool2d {
+                    kernel,
+                    stride,
+                    padding,
+                }
+            })
+        }
+        "flatten" => Ok(NnModule::Flatten {
+            // nn.Flatten defaults (1, -1) — NOT the table op's 0.
+            start_dim: int_arg("start_dim").unwrap_or(1),
+            end_dim: int_arg("end_dim").unwrap_or(-1),
+        }),
         "relu" => Ok(NnModule::Relu),
         "sigmoid" => Ok(NnModule::Sigmoid),
         "tanh" => Ok(NnModule::Tanh),
@@ -619,6 +875,48 @@ fn build_module(
             ),
         )),
     }
+}
+
+/// Deep-copy an explicit weight into a module parameter: never aliases or
+/// mutates the caller's tensor; requires_grad set LAST post-copy.
+fn copy_module_param(
+    registry: &Registry,
+    handle: &str,
+    expected_shape: &[i64],
+    what: &str,
+) -> Result<Tensor, (&'static str, String)> {
+    let source = registry
+        .get_tensor(handle)
+        .map_err(|lookup| (lookup.code(), lookup.message()))?;
+    let actual = source.size();
+    if actual != expected_shape {
+        return Err((
+            "shape_mismatch",
+            format!("nn: {what} must have shape {expected_shape:?}, got {actual:?}"),
+        ));
+    }
+    let detached = source.f_detach().map_err(|e| tch("nn", e))?;
+    let mut copy = detached.f_zeros_like().map_err(|e| tch("nn", e))?;
+    copy.f_copy_(&detached).map_err(|e| tch("nn", e))?;
+    Ok(copy.set_requires_grad(true))
+}
+
+fn ones_param(shape: &[i64]) -> Result<Tensor, (&'static str, String)> {
+    let t = Tensor::f_ones(shape, (Kind::Float, Device::Mps)).map_err(|e| tch("nn", e))?;
+    Ok(t.set_requires_grad(true))
+}
+
+fn zeros_param(shape: &[i64]) -> Result<Tensor, (&'static str, String)> {
+    let t = Tensor::f_zeros(shape, (Kind::Float, Device::Mps)).map_err(|e| tch("nn", e))?;
+    Ok(t.set_requires_grad(true))
+}
+
+fn float_module_arg(
+    args: &serde_json::Map<String, serde_json::Value>,
+    name: &str,
+    default: f64,
+) -> f64 {
+    args.get(name).and_then(|v| v.as_f64()).unwrap_or(default)
 }
 
 /// Construct an optimizer over a module's parameters (issue 0009 exp 4).
@@ -3074,5 +3372,265 @@ mod optimizer_semantics {
         assert!(grad.defined());
         let cpu = grad.f_detach().unwrap().f_to_device(Device::Cpu).unwrap();
         assert_eq!(convert::tensor_to_json(&cpu).unwrap(), json!([[0.0]]));
+    }
+}
+
+#[cfg(test)]
+mod module_sweep_semantics {
+    use super::*;
+    use crate::lifecycle::Lifecycle;
+    use serde_json::json;
+    use std::path::PathBuf;
+    use std::sync::Mutex;
+
+    fn bespoke(registry: &mut Registry, request: serde_json::Value) -> Response {
+        let parsed = parse_request(&request.to_string()).expect("parses");
+        let lifecycle = Mutex::new(Lifecycle::new(None));
+        let socket = PathBuf::from("/tmp/test.sock");
+        handle_request(registry, &lifecycle, &socket, parsed).0
+    }
+
+    fn handle_of(response: Response) -> String {
+        match response {
+            Response::Handle { handle, .. } => handle,
+            other => panic!("expected handle, got {other:?}"),
+        }
+    }
+
+    fn make(registry: &mut Registry, data: serde_json::Value) -> String {
+        let t = convert::json_to_tensor(&data, Kind::Float, Device::Mps).unwrap();
+        registry.insert_tensor(t)
+    }
+
+    fn forward(registry: &mut Registry, module: &str, x: &str) -> String {
+        handle_of(bespoke(
+            registry,
+            json!({"op":"forward","module": module, "tensor": x}),
+        ))
+    }
+
+    fn cpu_json(registry: &Registry, h: &str) -> serde_json::Value {
+        let cpu = registry
+            .get_tensor(h)
+            .unwrap()
+            .f_detach()
+            .unwrap()
+            .f_to_device(Device::Cpu)
+            .unwrap();
+        convert::tensor_to_json(&cpu).unwrap()
+    }
+
+    #[test]
+    fn dropout_train_quartet_and_edges() {
+        let mut registry = Registry::new();
+        let x = make(&mut registry, serde_json::json!(vec![1.0; 1000]));
+        let d = handle_of(bespoke(
+            &mut registry,
+            json!({"op":"nn","kind":"dropout","args":{"p": 0.25}}),
+        ));
+        // Determinism under manual_seed.
+        tch::manual_seed(5);
+        let __t = forward(&mut registry, &d, &x);
+        let a = cpu_json(&registry, &__t);
+        tch::manual_seed(5);
+        let __t = forward(&mut registry, &d, &x);
+        let b = cpu_json(&registry, &__t);
+        assert_eq!(a, b);
+        // Zero fraction ≈ p; kept elements scaled by 1/(1-p).
+        let values = a.as_array().unwrap();
+        let zeros = values.iter().filter(|v| v.as_f64().unwrap() == 0.0).count();
+        let frac = zeros as f64 / values.len() as f64;
+        assert!((frac - 0.25).abs() < 0.07, "zero fraction {frac}");
+        let kept = values
+            .iter()
+            .map(|v| v.as_f64().unwrap())
+            .find(|v| *v != 0.0)
+            .unwrap();
+        assert!((kept - 1.0 / 0.75).abs() < 1e-5, "scale {kept}");
+        // Eval mode: identity.
+        bespoke(
+            &mut registry,
+            json!({"op":"nn_mode","module": d, "train": false}),
+        );
+        let __t = forward(&mut registry, &d, &x);
+        let e = cpu_json(&registry, &__t);
+        assert_eq!(e, serde_json::json!(vec![1.0; 1000]));
+        // p = 1 → all zeros, NO NaN.
+        let d1 = handle_of(bespoke(
+            &mut registry,
+            json!({"op":"nn","kind":"dropout","args":{"p": 1.0}}),
+        ));
+        let __t = forward(&mut registry, &d1, &x);
+        let z = cpu_json(&registry, &__t);
+        assert!(z
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|v| v.as_f64() == Some(0.0)));
+        // p = 0 → identity even in train mode.
+        let d0 = handle_of(bespoke(
+            &mut registry,
+            json!({"op":"nn","kind":"dropout","args":{"p": 0.0}}),
+        ));
+        let __t = forward(&mut registry, &d0, &x);
+        let i = cpu_json(&registry, &__t);
+        assert_eq!(i, serde_json::json!(vec![1.0; 1000]));
+        // p out of range rejected.
+        match bespoke(
+            &mut registry,
+            json!({"op":"nn","kind":"dropout","args":{"p": 1.5}}),
+        ) {
+            Response::Error { code, .. } => assert_eq!(code, "bad_argument"),
+            other => panic!("expected error, got {other:?}"),
+        }
+        // Gradient flows through the mask.
+        let xt = make(&mut registry, json!([1.0, 1.0]));
+        let tensor = registry.get_tensor(&xt).unwrap().set_requires_grad(true);
+        let xg = registry.insert_tensor(tensor);
+        let y = forward(&mut registry, &d, &xg);
+        let spec = nutorch_ops::find("sum").unwrap();
+        let loss = match execute_table(&mut registry, spec, &[y], &serde_json::Map::new()) {
+            Response::Handles { handles, .. } => handles[0].clone(),
+            other => panic!("{other:?}"),
+        };
+        let spec = nutorch_ops::find("backward").unwrap();
+        let _ = execute_table(&mut registry, spec, &[loss], &serde_json::Map::new());
+        let grad = registry.get_tensor(&xg).unwrap().f_grad().unwrap();
+        assert!(grad.defined());
+    }
+
+    #[test]
+    fn batch_norm_running_stats_evolve_and_eval_uses_them() {
+        let mut registry = Registry::new();
+        let bn = handle_of(bespoke(
+            &mut registry,
+            json!({"op":"nn","kind":"batch_norm","args":{"num_features": 2}}),
+        ));
+        let x = make(&mut registry, json!([[10.0, -10.0], [12.0, -8.0]]));
+        // Eval BEFORE any training: running stats are (0,1) → output = x.
+        bespoke(
+            &mut registry,
+            json!({"op":"nn_mode","module": bn, "train": false}),
+        );
+        let y = forward(&mut registry, &bn, &x);
+        let before = cpu_json(&registry, &y);
+        // Train-mode forward updates the running stats in place…
+        bespoke(
+            &mut registry,
+            json!({"op":"nn_mode","module": bn, "train": true}),
+        );
+        let _ = forward(&mut registry, &bn, &x);
+        // …so a later EVAL forward differs from the first one.
+        bespoke(
+            &mut registry,
+            json!({"op":"nn_mode","module": bn, "train": false}),
+        );
+        let y = forward(&mut registry, &bn, &x);
+        let after = cpu_json(&registry, &y);
+        assert_ne!(before, after, "running stats did not move");
+    }
+
+    #[test]
+    fn mode_propagates_through_sequential() {
+        let mut registry = Registry::new();
+        let d = handle_of(bespoke(
+            &mut registry,
+            json!({"op":"nn","kind":"dropout","args":{"p": 0.5}}),
+        ));
+        let seq = handle_of(bespoke(
+            &mut registry,
+            json!({"op":"nn","kind":"sequential","args":{"children":[d]}}),
+        ));
+        bespoke(
+            &mut registry,
+            json!({"op":"nn_mode","module": seq, "train": false}),
+        );
+        let info = bespoke(&mut registry, json!({"op":"nn_info","module": seq}));
+        match info {
+            Response::Value { value, .. } => {
+                let lines: Vec<String> = serde_json::from_value(value).unwrap();
+                assert!(lines.iter().any(|l| l == "training: false"), "{lines:?}");
+            }
+            other => panic!("{other:?}"),
+        }
+        // Eval dropout inside the sequential is identity.
+        let x = make(&mut registry, json!([1.0, 2.0]));
+        let y = forward(&mut registry, &seq, &x);
+        assert_eq!(cpu_json(&registry, &y), json!([1.0, 2.0]));
+    }
+
+    #[test]
+    fn conv_groups_validation() {
+        let mut registry = Registry::new();
+        // groups = 0 must be a clean error, not a divide-by-zero panic.
+        match bespoke(
+            &mut registry,
+            json!({"op":"nn","kind":"conv2d","args":{
+                "in_channels":4,"out_channels":4,"kernel_size":3,"groups":0}}),
+        ) {
+            Response::Error { code, error, .. } => {
+                assert_eq!(code, "bad_argument");
+                assert!(error.contains("positive integer"));
+            }
+            other => panic!("expected error, got {other:?}"),
+        }
+        // Non-divisible groups must error, not silently truncate.
+        match bespoke(
+            &mut registry,
+            json!({"op":"nn","kind":"conv2d","args":{
+                "in_channels":4,"out_channels":4,"kernel_size":3,"groups":3}}),
+        ) {
+            Response::Error { code, error, .. } => {
+                assert_eq!(code, "bad_argument");
+                assert!(error.contains("divisible"));
+            }
+            other => panic!("expected error, got {other:?}"),
+        }
+        // conv_transpose validates OUT channels.
+        match bespoke(
+            &mut registry,
+            json!({"op":"nn","kind":"conv_transpose2d","args":{
+                "in_channels":4,"out_channels":3,"kernel_size":2,"groups":2}}),
+        ) {
+            Response::Error { code, error, .. } => {
+                assert_eq!(code, "bad_argument");
+                assert!(error.contains("out_channels"));
+            }
+            other => panic!("expected error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn conv_shape_validation_and_group_norm_consistency() {
+        let mut registry = Registry::new();
+        // Wrong conv weight shape errors.
+        let w = make(&mut registry, json!([[1.0, 2.0]]));
+        match bespoke(
+            &mut registry,
+            json!({"op":"nn","kind":"conv2d","args":{
+                "in_channels":1,"out_channels":2,"kernel_size":2,"weight": w}}),
+        ) {
+            Response::Error { code, .. } => assert_eq!(code, "shape_mismatch"),
+            other => panic!("expected error, got {other:?}"),
+        }
+        // group_norm: module forward equals tch's own f_group_norm (the
+        // recorded golden exclusion — internal consistency is the pin).
+        let gn = handle_of(bespoke(
+            &mut registry,
+            json!({"op":"nn","kind":"group_norm","args":{"num_groups":2,"num_channels":4}}),
+        ));
+        let x = make(
+            &mut registry,
+            json!([[[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]]]),
+        );
+        let y = forward(&mut registry, &gn, &x);
+        let via_module = cpu_json(&registry, &y);
+        let direct = registry
+            .get_tensor(&x)
+            .unwrap()
+            .f_group_norm(2, None::<&Tensor>, None::<&Tensor>, 1e-5, true)
+            .unwrap();
+        let direct = convert::tensor_to_json(&direct.f_to_device(Device::Cpu).unwrap()).unwrap();
+        assert_eq!(via_module, direct);
     }
 }

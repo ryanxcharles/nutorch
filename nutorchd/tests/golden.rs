@@ -13,7 +13,7 @@ const GOLDEN: &str = include_str!("golden.json");
 #[test]
 fn golden_cases_agree_with_real_pytorch() {
     let cases: Vec<serde_json::Value> = serde_json::from_str(GOLDEN).expect("golden.json parses");
-    assert!(cases.len() >= 240, "suspiciously few golden cases");
+    assert!(cases.len() >= 253, "suspiciously few golden cases");
 
     let mut failures = Vec::new();
     for case in &cases {
@@ -38,6 +38,9 @@ fn run_case(case: &serde_json::Value) -> Result<(), String> {
     }
     if case.get("optim_step").is_some() {
         return run_optim_case(case);
+    }
+    if case.get("nn_module_forward").is_some() {
+        return run_nn_module_case(case);
     }
     let mut registry = Registry::new();
     let op = case["op"].as_str().expect("op");
@@ -447,6 +450,78 @@ fn run_optim_case(case: &serde_json::Value) -> Result<(), String> {
                 step_index + 1
             ));
         }
+    }
+    Ok(())
+}
+
+/// Module sweep golden (issue 0009 exp 5): construct kind (explicit
+/// weights when parameterized), optional eval mode, forward a fixed
+/// input, compare exactly vs torch.nn.functional on MPS.
+fn run_nn_module_case(case: &serde_json::Value) -> Result<(), String> {
+    use nutorchd::lifecycle::Lifecycle;
+    use std::path::PathBuf;
+    use std::sync::Mutex;
+
+    let mut registry = Registry::new();
+    let lifecycle = Mutex::new(Lifecycle::new(None));
+    let socket = PathBuf::from("/tmp/golden.sock");
+    let bespoke = |registry: &mut Registry,
+                   request: serde_json::Value|
+     -> Result<serde_json::Value, String> {
+        let parsed = dispatch::parse_request(&request.to_string())
+            .map_err(|response| format!("parse: {response:?}"))?;
+        let (response, _) = dispatch::handle_request(registry, &lifecycle, &socket, parsed);
+        match response {
+            nutorchd::protocol::Response::Handle { handle, .. } => {
+                Ok(serde_json::Value::String(handle))
+            }
+            nutorchd::protocol::Response::Value { value, .. } => Ok(value),
+            other => Err(format!("bespoke: unexpected {other:?}")),
+        }
+    };
+
+    let kind = case["nn_module_forward"].as_str().unwrap();
+    let mut cargs = case["cargs"].as_object().cloned().unwrap_or_default();
+    for (field, arg) in [("weight", "weight"), ("bias", "bias_tensor")] {
+        if !case[field].is_null() {
+            let t = convert::json_to_tensor(&case[field], tch::Kind::Float, Device::Mps)
+                .map_err(|e| format!("{field}: {e}"))?;
+            let h = registry.insert_tensor(t);
+            cargs.insert(arg.to_string(), serde_json::Value::String(h));
+        }
+    }
+    let module = bespoke(
+        &mut registry,
+        serde_json::json!({"op":"nn","kind": kind, "args": cargs}),
+    )?;
+    let module = module.as_str().unwrap().to_string();
+    if case["eval_mode"].as_bool().unwrap_or(false) {
+        bespoke(
+            &mut registry,
+            serde_json::json!({"op":"nn_mode","module": module, "train": false}),
+        )?;
+    }
+
+    let input = &case["input"];
+    let input_kind =
+        convert::parse_kind(input["dtype"].as_str()).map_err(|e| format!("input dtype: {e}"))?;
+    let x = registry.insert_tensor(
+        convert::json_to_tensor(&input["data"], input_kind, Device::Mps)
+            .map_err(|e| format!("input: {e}"))?,
+    );
+    let y = bespoke(
+        &mut registry,
+        serde_json::json!({"op":"forward","module": module, "tensor": x}),
+    )?;
+    let y = y.as_str().unwrap().to_string();
+    let cpu = registry
+        .get_tensor(&y)
+        .map_err(|l| l.message())?
+        .f_to_device(Device::Cpu)
+        .map_err(|e| format!("cpu: {e}"))?;
+    let actual = convert::tensor_to_json(&cpu).map_err(|e| format!("json: {e}"))?;
+    if &actual != &case["expect_output"] {
+        return Err(format!("expected {}, got {actual}", case["expect_output"]));
     }
     Ok(())
 }

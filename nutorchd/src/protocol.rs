@@ -62,6 +62,12 @@ pub enum Bespoke {
         optimizer: String,
         lr: f64,
     },
+    /// Train/eval mode (issue 0009 exp 5).
+    #[serde(rename = "nn_mode")]
+    NnMode {
+        module: String,
+        train: bool,
+    },
     Status,
     #[serde(rename = "set_ttl")]
     SetTtl {
