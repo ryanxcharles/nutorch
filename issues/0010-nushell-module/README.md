@@ -1,6 +1,7 @@
 +++
-status = "open"
+status = "closed"
 opened = "2026-06-11"
+closed = "2026-06-11"
 +++
 
 # Issue 10: The Nushell module — native data over the same thin CLI
@@ -91,3 +92,25 @@ wrapper signatures give for free.
   **Pass** (185 generated wrappers + prelude; the nu training twin
   byte-identical to zsh; nu's broken non-finite comparisons discovered and
   routed around via string-form detection)
+
+## Conclusion
+
+**Solved**, in one experiment. The decision to build a generated script module
+instead of a plugin paid exactly as argued: the whole client is 1,219 lines of
+generated Nushell (185 wrappers from the ops table — its fourth consumer — plus
+a hand-written prelude), a `--json` mode on four CLI verbs, and zero daemon
+changes. The staleness test makes drift impossible; the nu training twin lands
+byte-identical to its zsh sibling (same seed, same daemon, two shells).
+
+The experiment's finds were all at the data boundary, all caught by probing the
+real shell: **nu 0.113's float comparisons are unreliable for non-finite
+values** (`1.5 == inf` is true; `inf > 0` is false), so the encoder detects
+NaN/±inf by string form; a piped LIST renders to externals as box-drawing glyphs
+(the design review's catch — variadic wrappers join explicitly); and flag
+passthrough needs `def --wrapped`. With those routed around, non-finite values
+cross the boundary as REAL Nushell floats — round trips are lossless in Nushell
+where bash still sees dialect tokens.
+
+The original vision's sentence — "Nushell remains the premium client" — is now
+true in the only way v2 could honor it: not a privileged protocol, but the same
+thin wire with the data boundary fully translated.
