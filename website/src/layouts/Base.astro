@@ -1,0 +1,57 @@
+---
+import "@fontsource/space-grotesk/500.css";
+import "@fontsource/space-grotesk/700.css";
+import "@fontsource/jetbrains-mono/400.css";
+import "../styles/global.css";
+import Footer from "../components/Footer.astro";
+import Header from "../components/Header.astro";
+
+interface Props {
+  title: string;
+  description: string;
+}
+
+const { title, description } = Astro.props;
+const ogImage = new URL("/images/og-nutorch.png", Astro.site ?? Astro.url);
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/images/nutorch-2d-192.png" type="image/png" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content={ogImage} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script is:inline>
+      // Theme init, before first paint. Respects an explicitly set
+      // data-theme attribute (used by tests); otherwise localStorage,
+      // falling back to the system preference.
+      (() => {
+        const root = document.documentElement;
+        if (root.dataset.theme) return;
+        let stored = null;
+        try {
+          stored = localStorage.getItem("theme");
+        } catch {}
+        root.dataset.theme = stored
+          ?? (matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light");
+      })();
+    </script>
+  </head>
+  <body class="flex min-h-screen flex-col bg-background text-foreground antialiased">
+    <Header />
+    <main class="flex-1">
+      <slot />
+    </main>
+    <Footer />
+  </body>
+</html>

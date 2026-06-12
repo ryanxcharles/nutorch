@@ -3,3 +3,8 @@ logs/
 target/
 .venv-torch/
 .libtorch
+
+# website (issue 0012)
+website/node_modules/
+website/dist/
+website/.astro/

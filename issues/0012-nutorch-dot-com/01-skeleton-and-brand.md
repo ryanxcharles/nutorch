@@ -168,3 +168,81 @@ and `--shiki-` the right prefix (the `--astro-code-` prefix applies only to the
 unrelated css-variables theme path). **Third pass: APPROVED** — both fixes
 confirmed verbatim; one non-blocking observation (the span-level
 `background-color` is redundant but harmless).
+
+## Result
+
+**Result:** Pass
+
+The skeleton stands and the landing page is real in both modes.
+
+- **Scaffold**: `website/` with Astro 6.4.6 (declared `^6.1`; static), Tailwind
+  4.3 via `@tailwindcss/vite`, Bun (276 installs across 375 packages, `bun.lock`
+  committed, `--frozen-lockfile` verified as the steady-state check); no React,
+  no islands — the only client JS is the inline theme-init, the toggle, and the
+  copy button. `.gitignore` covers `website/{node_modules,dist,.astro}`.
+- **The palette was measured, as designed**: a sharp-based sampler bucketed the
+  2D mark's opaque pixels — shell green `#60d060/#60c060` family, flame
+  `#f06020/#f07020` family — yielding brand tokens `--shell: #5cc962`,
+  `--flame: #f06820`, with per-mode primaries (light: green ink `#28933e` on
+  warm off-white `#f7f6f1`; dark: green glow `#6fd877` on warm near-black
+  `#0f130f`). Tokens live as raw CSS variables swapped on
+  `:root[data-theme="dark"]`, consumed through Tailwind's `@theme inline` so
+  `bg-primary`/`text-muted` etc. work everywhere.
+- **Dark/light**: the no-flash init script (respects a pre-set `data-theme`
+  attribute — which the screenshot harness then uses — else
+  `localStorage ?? prefers-color-scheme`), header toggle with sun/moon
+  persisting to localStorage. An accidental confirmation of the system-pref
+  path: headless Chrome inherited macOS dark mode and the bare `/` rendered dark
+  on its own.
+- **Shiki**: the `CodeBlock.astro` wrapper bakes
+  `themes={{ vitesse-light, vitesse-dark }}` into every block; built HTML
+  carries 12 distinct `--shiki-dark` colors across 94 dual-theme spans; the
+  `!important` glue rule is present in the built CSS (minified, space elided:
+  `var(--shiki-dark)!important`) and PROVEN effective by the screenshots — code
+  blocks visibly switch themes with the page.
+- **Assets**: `process-images.ts` (sharp + png-to-ico) emitted favicon.ico,
+  64/128/192 marks, hero 1x/2x from the 3D render, and a 1200×630 OG image
+  (mark + wordmark + tagline on brand dark); favicon links + OG/twitter meta in
+  the built head. Sources copied from `v1/raw-images/` — v1 untouched.
+- **The landing page**, top to bottom: header (mark + two-tone wordmark — `nu`
+  green, `torch` flame — Docs→GitHub placeholder, GitHub, toggle); hero (3D
+  shell over a soft radial brand glow, "GPU tensors for every shell",
+  Install/GitHub buttons); Three commands (the brew install block with a copy
+  button); See it run (bash and nushell demos side by side + an autograd block);
+  four feature cards; footer.
+- **Verification gates**: build exits 0 (one recorded UPSTREAM warning: Node's
+  DEP0205 from Astro's own loader — present for any Astro 6 project on this
+  Node, not from our code); both token sets in built CSS; dual-theme spans +
+  glue asserted; assets + meta asserted; screenshots of BOTH modes captured via
+  headless Chrome (`logs/issue-0012/landing-{light,dark}.png`, regenerable:
+  `sed` a `data-theme` attribute into a dist test copy and screenshot it) — both
+  reviewed by eye: dark reads as glow on near-black, light as ink on warm
+  off-white, hero glow lifts the shell in both. `bun install --frozen-lockfile`
+  green; dprint clean on touched files; Rust tree untouched.
+
+## Conclusion
+
+The look is decided and the primitives are in place: brand tokens measured from
+the logo, both modes first-class with proven code-theme switching, and a landing
+page that pitches, installs, and demos in one screen-and-a-half. The user is the
+final judge of beauty — screenshots are ready for review, and refinements can
+ride Experiment 2, which should add the docs layout (`DocPage.astro` with
+sidebar) and the markdown content collections that the Shiki markdown config is
+already waiting for.
+
+## Result Review
+
+**Reviewer:** `adversarial-reviewer` subagent (fresh context), reviewing BEFORE
+the result commit. **Verdict: APPROVED — no Required findings.** The reviewer
+reproduced every load-bearing claim independently: frozen-lockfile install
+green; build exits 0 with exactly the one recorded upstream DEP0205 warning; 12
+distinct `--shiki-dark` colors across exactly 94 dual-theme spans; both token
+sets and the minified `!important` glue in the built CSS; the measured palette
+hexes present verbatim; the two screenshots confirmed as genuinely different
+renders with code themes visibly switching; fonts fully self-hosted (no CDN
+requests — the only external URLs are github.com anchors and the `og:image`
+metadata); assets complete; `raw-images/` byte-identical to the `v1/` sources
+with `v1/` clean; `.gitignore` effective; plan commit 9ded370 predating
+implementation; the result uncommitted at review time. Two Nits folded before
+commit: "Astro 6.1" corrected to the installed 6.4.6 (declared `^6.1`), and "276
+packages" expanded to the installer's full "276 installs across 375 packages".

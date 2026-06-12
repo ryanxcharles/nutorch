@@ -148,7 +148,8 @@ nutorch/website/              ← lives in THIS repo (like termsurf)
 ## Experiments
 
 - [Experiment 1: The skeleton and the brand — one beautiful page](01-skeleton-and-brand.md)
-  — **Designed**
+  — **Pass** (skeleton + measured brand tokens + landing page, both modes proven
+  by screenshot; Shiki dual themes switching via the !important glue)
 
 ## Scope
 

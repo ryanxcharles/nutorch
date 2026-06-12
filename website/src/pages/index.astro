@@ -1,0 +1,166 @@
+---
+import CodeBlock from "../components/CodeBlock.astro";
+import Base from "../layouts/Base.astro";
+
+const install = `brew tap nutorch/nutorch
+brew trust nutorch/nutorch   # brew 6.0+ requires trusting third-party taps
+brew install nutorch`;
+
+const bashDemo = `a=$(torch tensor '[1,2,3]')
+b=$(torch tensor '[4,5,6]')
+torch add $a $b | torch value
+# [5.0,7.0,9.0]   computed on the GPU`;
+
+const nuDemo = `use nutorch.nu *
+let t = ([[1 2] [3 4]] | nutorch tensor)
+$t | nutorch mm $t | nutorch value
+# native table out`;
+
+const trainDemo = `w=$(torch randn '[3]' --requires_grad)
+loss=$(torch mul $w $w | torch sum)
+torch backward $loss
+torch grad $w | torch value`;
+
+const features = [
+  {
+    title: "GPU-only, by design",
+    body:
+      "Every tensor lives on the Apple-silicon GPU via Metal. There is no "
+      + "device option — that is the point of the library.",
+  },
+  {
+    title: "Any shell is first-class",
+    body:
+      "Handles are plain strings on stdout. Real POSIX pipelines compose in "
+      + "bash, zsh, and fish; Nushell gets a native structured-data module.",
+  },
+  {
+    title: "Autograd and neural nets",
+    body:
+      "Gradients flow through any pipeline. Modules, optimizers, training "
+      + "loops, and safetensors interchange with PyTorch — from the shell.",
+  },
+  {
+    title: "PyTorch fidelity",
+    body:
+      "Command names, argument order, defaults, and broadcasting semantics "
+      + "match PyTorch wherever possible. 185 ops and counting.",
+  },
+];
+---
+
+<Base
+  title="nutorch — GPU tensors for every shell"
+  description="A tensor daemon for Apple silicon: PyTorch semantics, Metal GPU compute, and string handles that flow through ordinary shell pipelines."
+>
+  <!-- Hero -->
+  <section class="mx-auto max-w-5xl px-6 pt-16 pb-12 sm:pt-24">
+    <div class="flex flex-col items-center gap-10 sm:flex-row sm:gap-14">
+      <div class="relative shrink-0">
+        <div class="hero-glow absolute -inset-14" aria-hidden="true"></div>
+        <img
+          src="/images/nutorch-hero.png"
+          srcset="/images/nutorch-hero.png 1x, /images/nutorch-hero@2x.png 2x"
+          alt="The nutorch logo: a green nautilus shell with a flame"
+          width="300"
+          height="300"
+          class="relative w-52 sm:w-72"
+        />
+      </div>
+      <div class="text-center sm:text-left">
+        <h1
+          class="font-display text-4xl font-bold tracking-tight text-balance sm:text-5xl"
+        >
+          GPU tensors for <span class="text-primary">every</span> shell
+        </h1>
+        <p class="mt-5 max-w-xl text-lg leading-relaxed text-muted">
+          nutorch is a tensor daemon for Apple silicon: PyTorch semantics,
+          Metal GPU compute, and plain string handles that flow through
+          ordinary pipelines — bash, zsh, fish, Nushell, anything.
+        </p>
+        <div
+          class="mt-8 flex flex-wrap items-center justify-center gap-4 sm:justify-start"
+        >
+          <a
+            href="#install"
+            class="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-background transition-opacity hover:opacity-85"
+          >Install</a>
+          <a
+            href="https://github.com/nutorch/nutorch"
+            class="rounded-lg border border-border px-5 py-2.5 text-sm font-semibold transition-colors hover:border-muted"
+          >GitHub</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Install -->
+  <section id="install" class="mx-auto max-w-5xl scroll-mt-8 px-6 py-12">
+    <h2 class="font-display text-2xl font-bold tracking-tight">
+      Three commands
+    </h2>
+    <p class="mt-2 text-muted">
+      A prebuilt bottle pours in seconds — no Python, no Rust, no checkout.
+    </p>
+    <div class="relative mt-6">
+      <CodeBlock code={install} lang="bash" />
+      <button
+        id="copy-install"
+        type="button"
+        aria-label="Copy install commands"
+        data-copy={install}
+        class="absolute top-3 right-3 rounded-md border border-border bg-surface px-2.5 py-1 text-xs font-medium text-muted transition-colors hover:text-foreground"
+      >copy</button>
+    </div>
+  </section>
+
+  <!-- Demos -->
+  <section class="mx-auto max-w-5xl px-6 py-12">
+    <h2 class="font-display text-2xl font-bold tracking-tight">See it run</h2>
+    <p class="mt-2 text-muted">
+      The daemon starts itself on the first command and owns the GPU; your
+      shell just passes handles around.
+    </p>
+    <div class="mt-6 grid gap-6 lg:grid-cols-2">
+      <div>
+        <h3 class="mb-3 font-mono text-sm font-medium text-muted">bash</h3>
+        <CodeBlock code={bashDemo} lang="bash" />
+      </div>
+      <div>
+        <h3 class="mb-3 font-mono text-sm font-medium text-muted">nushell</h3>
+        <CodeBlock code={nuDemo} lang="nu" />
+      </div>
+    </div>
+    <div class="mt-6">
+      <h3 class="mb-3 font-mono text-sm font-medium text-muted">
+        autograd, in your terminal
+      </h3>
+      <CodeBlock code={trainDemo} lang="bash" />
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="mx-auto max-w-5xl px-6 py-12 pb-20">
+    <div class="grid gap-5 sm:grid-cols-2">
+      {
+        features.map((f) => (
+          <div class="rounded-xl border border-border bg-surface p-6">
+            <h3 class="font-display text-lg font-bold">{f.title}</h3>
+            <p class="mt-2 text-sm leading-relaxed text-muted">{f.body}</p>
+          </div>
+        ))
+      }
+    </div>
+  </section>
+</Base>
+
+<script>
+  const button = document.getElementById("copy-install");
+  button?.addEventListener("click", async () => {
+    const text = button.dataset.copy;
+    if (!text) return;
+    await navigator.clipboard.writeText(text);
+    button.textContent = "copied";
+    setTimeout(() => (button.textContent = "copy"), 1500);
+  });
+</script>

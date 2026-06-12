@@ -1,0 +1,23 @@
+{
+  "name": "nutorch-website",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "build:images": "bun run scripts/process-images.ts"
+  },
+  "dependencies": {
+    "@fontsource/jetbrains-mono": "^5.2.8",
+    "@fontsource/space-grotesk": "^5.2.8",
+    "@tailwindcss/vite": "^4.2.1",
+    "astro": "^6.1.1",
+    "tailwindcss": "^4.2.1"
+  },
+  "devDependencies": {
+    "png-to-ico": "^3.0.1",
+    "sharp": "^0.34.5"
+  }
+}
