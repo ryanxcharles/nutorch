@@ -2,8 +2,9 @@
 
 ## Open
 
-| # | Title | Opened |
-| - | ----- | ------ |
+| #                                        | Title                                                   | Opened     |
+| ---------------------------------------- | ------------------------------------------------------- | ---------- |
+| [0017](0017-mirrored-examples/README.md) | Mirrored examples, everywhere — including the reference | 2026-06-12 |
 
 ## Closed
 
