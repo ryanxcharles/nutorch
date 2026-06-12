@@ -88,3 +88,45 @@ cannot drift it; confirmed the new argument-form snippets pass the honesty
 checker's verb scan; and confirmed ops.md's existing dual-input sentence is
 already shell-neutral. One Nit folded: that ops.md fact is now recorded in the
 inventory for completeness.
+
+## Result
+
+**Result:** Pass
+
+The hedges are gone and both panels tell the same strong truth.
+
+- **Both displayed snippets ran live first** (explicit-`use`, private TMPDIR):
+  `$a | nutorch add $b` and `nutorch add $a $b` both → `[5.0, 7.0, 9.0]`.
+- **All five `pipeline-first` hedge sites straightened** (the reviewer's
+  enumerated set): getting-started's prose returns to "both of these work, in
+  both shells" with the two-form nu panel; tensors' prose becomes "one grammar,
+  both shells" with its two-form panel; the nushell page now describes the
+  wrappers as honoring the dual input pattern. Grep over `website/src`: zero
+  `pipeline-first` remnants.
+- **Gates**: build clean (20 pages); `check:content`, `check:links`,
+  `check:tabs` (count map unchanged — the panels changed content, not
+  structure), `check:theme` all green; dprint clean; zero `.rs` diffs; `v1/`
+  untouched. Screenshots: `logs/issue-0016/dual-input-nu-{light,dark}.png` (the
+  getting-started page pinned to nu).
+
+## Conclusion
+
+Documentation and implementation agree again: the Dual Input Pattern is one
+rule, stated once, true in both shells. With Experiment 1's delegation and this
+straightening, issue 0016 is complete — close it.
+
+## Result Review
+
+**Reviewer:** `adversarial-reviewer` subagent (fresh context), reviewing BEFORE
+the result commit and gating the issue close. **Verdict: APPROVED — no Required
+findings.** The reviewer ran both displayed dual-input forms verbatim
+(`[5.0, 7.0, 9.0]` each), confirmed zero `pipeline-first` hits in `website/src`,
+read all three straightened sections, reproduced every gate (build,
+check:content, check:tabs with the unchanged count map, check:links,
+check:theme, dprint), and verified the process state (plan commit 8e86888
+plan-only; zero `.rs` diffs at review time; `v1/` untouched). One Optional
+folded as a review-prompted ADDENDUM beyond the experiment's declared no-module
+scope (recorded as the deviation it is): the generated module's banner comment
+still said "Wrappers are pipeline-first" — the generator string updated, module
+regenerated, the staleness test and the 11/11 parity harness re-run green, zero
+`pipeline-first` remnants anywhere in the project's live tree.

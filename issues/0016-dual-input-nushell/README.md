@@ -69,7 +69,8 @@ contract than bash.
   checks; CLI arity errors surface through the module; variadic and creation
   wrappers byte-untouched)
 - [Experiment 2: The docs straighten — both forms, both shells](02-the-docs-straighten.md)
-  — **Designed**
+  — **Pass** (all five pipeline-first hedges retired; both dual-input nu panels
+  show both forms, verified live; count map unchanged)
 
 ## Scope
 

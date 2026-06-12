@@ -49,7 +49,7 @@ Three things just happened:
    `torch value` read it from stdin and printed the data as JSON.
 
 Every operation accepts its leftmost tensor from the pipeline or as an argument
-(the Nushell module is pipeline-first by design):
+— both of these work, in both shells:
 
 ```bash
 torch add $a $b           # argument form
@@ -57,7 +57,8 @@ echo $a | torch add $b    # pipeline form: stdin fills the leftmost slot
 ```
 
 ```nu
-$a | nutorch add $b   # pipeline-first: $in fills the leftmost slot
+$a | nutorch add $b   # pipeline form: $in fills the leftmost slot
+nutorch add $a $b     # argument form
 ```
 
 ## A taste of more

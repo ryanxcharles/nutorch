@@ -13,8 +13,8 @@ a named error rather than a mystery.
 
 ## The dual input pattern
 
-Every operation accepts its leftmost tensor from the pipeline or as an argument;
-the Nushell module is pipeline-first by design:
+Every operation accepts its leftmost tensor from the pipeline or as an argument
+— one grammar, both shells:
 
 ```bash
 torch add $a $b                   # argument form
@@ -22,7 +22,8 @@ cat handles.txt | torch add $b    # pipeline form
 ```
 
 ```nu
-$a | nutorch add $b   # pipeline-first: $in is the leftmost tensor
+$a | nutorch add $b   # pipeline form: $in is the leftmost tensor
+nutorch add $a $b     # argument form
 ```
 
 The rule is the **stdin prefix grammar**: stdin fills the leftmost missing

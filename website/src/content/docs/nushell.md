@@ -47,10 +47,12 @@ $t | nutorch mm $t | nutorch value            # a native table
 nutorch tensors | where bytes > 1mb | get handle | each {|h| nutorch free $h }
 ```
 
-Wrappers are pipeline-first — the first tensor slot is `$in` — and every one of
-the 185 ops is wrapped, plus the registry and daemon verbs. Non-finite values
-cross the boundary as REAL Nushell NaN/infinity floats; the JSON dialect
-(`"NaN"`, `"Infinity"`, `"-Infinity"`) is handled for you in both directions.
+Wrappers honor the dual input pattern — pipe the leftmost tensor in as `$in`, or
+pass handles as arguments and the CLI's grammar fills the missing slots — and
+every one of the 185 ops is wrapped, plus the registry and daemon verbs.
+Non-finite values cross the boundary as REAL Nushell NaN/infinity floats; the
+JSON dialect (`"NaN"`, `"Infinity"`, `"-Infinity"`) is handled for you in both
+directions.
 
 ## Training, natively
 
