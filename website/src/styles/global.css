@@ -224,6 +224,19 @@ body {
   );
 }
 
+/* Pagefind UI themed with the brand tokens; tracks both modes because
+ * the values are the swapped CSS variables. */
+#docs-search .pagefind-ui {
+  --pagefind-ui-primary: var(--primary);
+  --pagefind-ui-text: var(--fg);
+  --pagefind-ui-background: var(--surface);
+  --pagefind-ui-border: var(--border);
+  --pagefind-ui-tag: var(--surface-edge);
+  --pagefind-ui-border-width: 1px;
+  --pagefind-ui-border-radius: 0.75rem;
+  --pagefind-ui-font: inherit;
+}
+
 /* Theme toggle: show the icon for the mode you would switch TO. */
 :root .toggle-moon,
 :root[data-theme="dark"] .toggle-sun {

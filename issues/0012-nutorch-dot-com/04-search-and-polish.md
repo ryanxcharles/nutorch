@@ -122,3 +122,79 @@ into); the `ogType` prop plumbing named explicitly in the Changes list; the
 sitemap gains a `filter` dropping the duplicate `/docs/` URL (sitemaps enumerate
 routes and ignore canonical links). Nit folded: dependency versions pinned and
 the two CLI/CSS contracts re-verified at implementation.
+
+## Result
+
+**Result:** Pass
+
+Search finds, the sitemap maps, every link resolves, and the QA sweep is clean
+in both modes.
+
+- **Pagefind 1.5.2** (`--site` flag confirmed live): build is now
+  `astro build && pagefind --site dist` — 17 pages indexed (the 8 written + 9
+  reference pages; landing and 404 excluded by `data-pagefind-body` scoping, and
+  the `/docs/` alias of getting-started excluded explicitly, mirroring the
+  sitemap filter — result-review catch). One UI instance per docs page mounted
+  outside the twice-rendered nav, themed via `--pagefind-ui-*` onto the brand
+  tokens.
+- **Search proven by real interaction**: headless Chrome driven over RAW CDP
+  (`scripts/screenshot-search.ts` — Pagefind's UI never settles under
+  `--virtual-time-budget`, so the harness uses real time: navigate, type
+  "backward", poll for result links, capture; it generates its own theme-pinned
+  fixtures from the built page, so it reproduces from any fresh build —
+  result-review catch: the first version depended on hand-made fixtures it could
+  not recreate). Both modes: **12 result links** rendered, first group the
+  autograd REFERENCE page (the generated content is indexed — gate requirement
+  met), highlights legible on both themes
+  (`logs/issue-0012/search-{light,dark}.png`). The index also verified at the
+  API level: `pagefind.search("backward")` → 6 results, first
+  `/docs/reference/autograd/`.
+- **Sitemap** (`@astrojs/sitemap` 3.7.3): `sitemap-index.xml` + `sitemap-0.xml`
+  with 18 URLs on the `https://nutorch.com` origin; the duplicate `/docs/`
+  filtered out as designed (asserted absent); 404 excluded automatically;
+  `robots.txt` points at the index.
+- **404 page**: "unknown handle: `404://` — No such tensor"; brand mark,
+  Home/Docs buttons; `dist/404.html` emitted; on-brand in both modes
+  (screenshots).
+- **Link integrity**: `check:links` walks all 20 built pages — internal routes
+  AND anchors resolve; 3 external links listed, never fetched (local-only).
+  Adversarial: a planted dead link failed the gate by name, then removed.
+- **OG polish**: docs pages emit `og:type article`, landing `website`; `og:url`
+  matches each route (canonical-aware); `og:site_name nutorch`.
+- **The QA sweep**: clean rebuild from `rm -rf dist`; ALL gates green (build,
+  `check:content`, `check:ops-ref`, `check:links`, frozen-lockfile, dprint); 8
+  QA screenshots (landing, tensors, reference creation, 404 × both modes) plus
+  the 2 search shots reviewed by eye — no visual defects found; the site holds
+  the brand in both modes.
+- **Hygiene**: no Rust changes; `v1/` untouched.
+
+## Conclusion
+
+The site is complete for this issue's scope: a beautiful landing page, 17
+documentation pages (8 written + 9 generated), working client-side search,
+sitemap/robots/OG/404, and four executable gates (`check:content`,
+`check:ops-ref`, `check:links`, plus the build itself) that keep it honest. The
+issue's goal is met locally — `dist/` is production-quality and the only thing
+between it and nutorch.com is the deployment issue this issue deliberately
+excluded. Close it.
+
+## Result Review
+
+**Reviewer:** `adversarial-reviewer` subagent (fresh context), reviewing BEFORE
+the result commit and gating the issue close. **First pass: APPROVED — no
+Required findings**, with every substantive claim reproduced independently:
+clean rebuild (20 pages, 0 errors), all four gates green, the link gate failing
+on all three planted defect classes (dead route, bad cross-page anchor, bad
+local anchor), the sitemap's 18 URLs with no `/docs/` duplicate, OG types/urls
+correct, the search harness re-run end to end (12 result links, reference-page
+hit, both modes), QA screenshots on-brand, plan commit 9a30ed2 plan-only, `v1/`
+and the Rust tree untouched, and the spine's Scope "In" fully delivered across
+the four experiments. Two Optionals and a Nit folded before commit: the search
+harness now GENERATES its own theme-pinned fixtures (the first version navigated
+to hand-made files a fresh build would not contain — genuine but
+unreproducible-as-shipped); the `/docs/` alias of getting-started is excluded
+from the search index (mirroring the sitemap filter; the index drops 18 → 17
+pages, all unique); the Result's page-count wording corrected to match.
+Post-fold re-run: 17 indexed, harness reproduces from a fresh build (12 links,
+reference hit, both modes), all gates green. **Second pass: APPROVED** — the
+reviewer re-reproduced all three folds from a clean build itself.

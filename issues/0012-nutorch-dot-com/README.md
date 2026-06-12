@@ -158,7 +158,8 @@ nutorch/website/              ← lives in THIS repo (like termsurf)
   — **Pass** (185 ops / 9 generated category pages; staleness gate bites; dprint
   fixed-point invariant proven on the first draft)
 - [Experiment 4: Search, sitemap, and the finishing pass](04-search-and-polish.md)
-  — **Designed**
+  — **Pass** (Pagefind search proven by CDP-driven interaction in both modes;
+  sitemap with the /docs duplicate filtered; link gate bites; on-brand 404)
 
 ## Scope
 

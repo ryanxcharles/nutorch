@@ -31,12 +31,17 @@ const idx = all.findIndex((e) => e.id === entry.id);
 const prev = idx > 0 ? all[idx - 1] : undefined;
 const next = idx < all.length - 1 ? all[idx + 1] : undefined;
 const href = (e: (typeof all)[number]) => `/docs/${e.id}/`;
+
+// The /docs route is a duplicate render of getting-started (canonical
+// points at the slug); keep it out of the search index like the sitemap.
+const indexable = Astro.url.pathname !== "/docs/";
 ---
 
 <Base
   title={`${entry.data.title} — nutorch docs`}
   description={entry.data.description}
   canonical={canonical}
+  ogType="article"
 >
   <div class="mx-auto flex max-w-5xl flex-col gap-8 px-6 py-10 md:flex-row">
     <nav class="w-full shrink-0 md:w-48" aria-label="Documentation">
@@ -56,7 +61,14 @@ const href = (e: (typeof all)[number]) => `/docs/${e.id}/`;
         <DocNav sections={sections} currentId={entry.id} />
       </div>
     </nav>
-    <article class="prose-nutorch min-w-0 flex-1">
+    <article
+      class="prose-nutorch min-w-0 flex-1"
+      data-pagefind-body={indexable ? true : undefined}
+    >
+      <!-- One search instance per page, outside the twice-rendered DocNav
+           (a per-nav mount would duplicate ids). Hydrates only in built
+           output — pagefind assets exist after `bun run build`. -->
+      <div id="docs-search" class="mb-8" data-pagefind-ignore></div>
       <h1>{entry.data.title}</h1>
       <slot />
       <div
@@ -87,3 +99,17 @@ const href = (e: (typeof all)[number]) => `/docs/${e.id}/`;
     </article>
   </div>
 </Base>
+
+<link rel="stylesheet" href="/pagefind/pagefind-ui.css" />
+<script is:inline src="/pagefind/pagefind-ui.js"></script>
+<script is:inline>
+  window.addEventListener("DOMContentLoaded", () => {
+    if (typeof PagefindUI !== "undefined") {
+      new PagefindUI({
+        element: "#docs-search",
+        showSubResults: true,
+        showImages: false,
+      });
+    }
+  });
+</script>

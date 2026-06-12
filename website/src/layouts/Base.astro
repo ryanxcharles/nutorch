@@ -10,13 +10,14 @@ interface Props {
   title: string;
   description: string;
   canonical?: string;
+  ogType?: "website" | "article";
 }
 
-const { title, description, canonical } = Astro.props;
-const ogImage = new URL("/images/og-nutorch.png", Astro.site ?? Astro.url);
-const canonicalUrl = canonical
-  ? new URL(canonical, Astro.site ?? Astro.url)
-  : undefined;
+const { title, description, canonical, ogType = "website" } = Astro.props;
+const site = Astro.site ?? Astro.url;
+const ogImage = new URL("/images/og-nutorch.png", site);
+const canonicalUrl = canonical ? new URL(canonical, site) : undefined;
+const ogUrl = canonicalUrl ?? new URL(Astro.url.pathname, site);
 ---
 
 <!doctype html>
@@ -31,7 +32,9 @@ const canonicalUrl = canonical
     {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
-    <meta property="og:type" content="website" />
+    <meta property="og:type" content={ogType} />
+    <meta property="og:url" content={ogUrl} />
+    <meta property="og:site_name" content="nutorch" />
     <meta property="og:image" content={ogImage} />
     <meta name="twitter:card" content="summary_large_image" />
     <script is:inline>
