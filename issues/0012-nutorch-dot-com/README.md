@@ -145,6 +145,11 @@ nutorch/website/              ← lives in THIS repo (like termsurf)
 4. **Versioned docs?** No — one version, tracking main (0.1.x); revisit when
    there are users on old versions.
 
+## Experiments
+
+- [Experiment 1: The skeleton and the brand — one beautiful page](01-skeleton-and-brand.md)
+  — **Designed**
+
 ## Scope
 
 In: the Astro site under `website/`; brand/design system from the logo; landing
