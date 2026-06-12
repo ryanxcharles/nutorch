@@ -2,8 +2,9 @@
 
 ## Open
 
-| # | Title | Opened |
-| - | ----- | ------ |
+| #                                         | Title                                  | Opened     |
+| ----------------------------------------- | -------------------------------------- | ---------- |
+| [0016](0016-dual-input-nushell/README.md) | The Dual Input Pattern reaches Nushell | 2026-06-12 |
 
 ## Closed
 
