@@ -66,6 +66,11 @@ rendered as flat text while everything else got the two-shell treatment.
   "reference pages have tabs now"; fence-level baseline diff re-proves the
   plugin only wraps.
 
+## Experiments
+
+- [Experiment 1: Prelude dual input — tensor and value learn both hands](01-prelude-dual-input.md)
+  — **Designed**
+
 ## Scope
 
 In: prelude dual input for `tensor` and `value` (generator/prelude Rust +
