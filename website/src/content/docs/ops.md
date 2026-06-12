@@ -35,7 +35,12 @@ it as an argument (see [tensors](/docs/tensors/)).
 
 ## Reference
 
-A generated per-op reference — built from the same table the binaries use, so it
-cannot drift — is coming to this site in the next stage of issue 0012. Until it
-lands, `torch ops` and `torch <op> --help` are the reference, and they are
-always current.
+The full per-op reference is generated from the same table the binaries use, so
+it cannot drift: [creation](/docs/reference/creation/),
+[pointwise](/docs/reference/pointwise/),
+[comparison](/docs/reference/comparison/),
+[reduction](/docs/reference/reduction/),
+[linear algebra](/docs/reference/linalg/), [shape](/docs/reference/shape/),
+[loss](/docs/reference/loss/), [autograd](/docs/reference/autograd/), and
+[utility](/docs/reference/utility/) — or jump in from the Reference section in
+the sidebar.

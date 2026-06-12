@@ -155,7 +155,8 @@ nutorch/website/              ← lives in THIS repo (like termsurf)
   honesty checker caught a fictional verb; screenshots caught the
   details-element sidebar bug)
 - [Experiment 3: The ops reference — generated from the table](03-ops-reference.md)
-  — **Designed**
+  — **Pass** (185 ops / 9 generated category pages; staleness gate bites; dprint
+  fixed-point invariant proven on the first draft)
 
 ## Scope
 

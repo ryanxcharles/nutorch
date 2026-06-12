@@ -8,7 +8,9 @@
     "build": "astro build",
     "preview": "astro preview",
     "build:images": "bun run scripts/process-images.ts",
-    "check:content": "bun run scripts/check-content.ts"
+    "check:content": "bun run scripts/check-content.ts",
+    "gen:ops-ref": "bun run scripts/gen-ops-reference.ts",
+    "check:ops-ref": "bun run scripts/gen-ops-reference.ts --check"
   },
   "dependencies": {
     "@fontsource/jetbrains-mono": "^5.2.8",

@@ -112,3 +112,63 @@ if generator output is a dprint fixed point — now pinned as the invariant
 (dprint disagreement = generator bug). Two Nits folded: capture only the
 `usage:` line (line 2 of `--help` duplicates the summary), and the honesty
 checker's non-recursive read is the real reason the generated pages escape it.
+
+## Result
+
+**Result:** Pass
+
+185 ops, 9 generated pages, and a staleness gate that demonstrably bites.
+
+- **Generator**: `gen-ops-reference.ts` reads `torch ops --json` + each op's
+  `usage:` line (line 1 of `--help` only, as pinned), emits 9 category pages
+  with collection frontmatter (`section: "Reference"`, `order: 20+i`), in the
+  fixed category order. 19 total routes now build (10 prior + 9 reference).
+- **The dprint fixed-point invariant earned its keep immediately**: the first
+  generator draft hand-wrapped its intro prose one word earlier than dprint's
+  80-column fill; `dprint check` flagged all 9 files, and the GENERATOR was
+  fixed to emit dprint's exact wrapping — the committed files were never
+  hand-patched. `dprint check` now passes on all generated output.
+- **Coverage, asserted by script**: the 9 pages contain exactly 185 unique `###`
+  headings and the heading set EQUALS the `torch ops --json` name set.
+- **Staleness gate proven both ways**: `check:ops-ref` green on committed files;
+  a corrupted heading made it exit 1 naming the stale file. (The cleanup of that
+  test tripped a self-inflicted snag: `git checkout -- .` reverted ALL
+  uncommitted tracked edits — package.json's scripts and the ops.md links —
+  which were restored and the full check suite re-run green — recorded since it
+  cost a cycle.)
+- **Spot-check**: 5 ops across 5 categories (randn, sigmoid, gather,
+  cross_entropy, manual_seed) — page usage lines byte-match live `--help`.
+- **Sidebar by construction**: the Reference section with all 9 category links
+  appears on every docs page (asserted in built HTML), after Install, current
+  page highlighted — zero changes to DocPage/DocNav, as Experiment 2 promised.
+- **`ops.md` placeholder retired** with real links to all 9 pages.
+- **Screenshots** (`logs/issue-0012/ref-pointwise-{light,dark}.png`): the
+  longest reference page (71 pointwise ops) legible and on-brand in both modes.
+- **Gates**: build 0 errors; frozen-lockfile, `check:content`, `check:ops-ref`,
+  dprint all green; no Rust changes; `v1/` untouched.
+
+## Conclusion
+
+The reference is generated, gated, and integrated — issue design question 2 is
+fully settled (category pages; committed generated markdown with a byte-compare
+staleness check). The dprint fixed-point rule turned a would-be formatting fight
+into a one-line generator fix. What remains for the issue is Experiment 4:
+search (Pagefind), sitemap, OG polish, and the final whole-site QA pass.
+
+## Result Review
+
+**Reviewer:** `adversarial-reviewer` subagent (fresh context), reviewing BEFORE
+the result commit. **Verdict: APPROVED — no Required findings.** The reviewer
+reproduced everything independently: the 185-heading/9-category coverage with
+the heading set byte-equal to `torch ops --json`; the staleness gate biting on a
+corrupted file and restoring to identical shasums on regeneration; byte-stable
+double regeneration; its OWN five spot-check ops (zeros, matmul, softmax, cat,
+clamp) byte-matching live `--help`; 19 built pages with all 9 reference routes,
+sidebar links, and resolving ops.md links; the dprint fixed point; both
+screenshots genuinely two modes; plan commit 3905779 plan-only; Rust tree and
+`v1/` untouched. Three findings folded before commit: the git-checkout
+disclosure widened to name ALL reverted tracked edits (ops.md too, not just
+package.json); the generator's description pluralized ("The 1 utility
+operation"); and `--check` now also flags ORPHAN files no category produces
+(proven by test, then removed). Regenerated output re-verified: staleness gate,
+dprint check, and build all green after the folds.
