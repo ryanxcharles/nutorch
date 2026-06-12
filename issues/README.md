@@ -2,14 +2,14 @@
 
 ## Open
 
-| #                                            | Title                                                          | Opened     |
-| -------------------------------------------- | -------------------------------------------------------------- | ---------- |
-| [0011](0011-homebrew-distribution/README.md) | Homebrew distribution — nutorch installs like a normal package | 2026-06-11 |
+| # | Title | Opened |
+| - | ----- | ------ |
 
 ## Closed
 
 | #                                                     | Title                                                                              | Opened     | Closed     |
 | ----------------------------------------------------- | ---------------------------------------------------------------------------------- | ---------- | ---------- |
+| [0011](0011-homebrew-distribution/README.md)          | Homebrew distribution — nutorch installs like a normal package                     | 2026-06-11 | 2026-06-11 |
 | [0010](0010-nushell-module/README.md)                 | The Nushell module — native data over the same thin CLI                            | 2026-06-11 | 2026-06-11 |
 | [0009](0009-nn-optim/README.md)                       | nn/optim — modules and optimizers as first-class objects                           | 2026-06-11 | 2026-06-11 |
 | [0008](0008-autograd/README.md)                       | Autograd — gradients from the shell                                                | 2026-06-11 | 2026-06-11 |

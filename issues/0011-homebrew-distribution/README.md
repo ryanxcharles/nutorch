@@ -1,6 +1,7 @@
 +++
-status = "open"
+status = "closed"
 opened = "2026-06-11"
+closed = "2026-06-11"
 +++
 
 # Issue 11: Homebrew distribution — nutorch installs like a normal package
@@ -101,3 +102,44 @@ beyond what brew gives for free.
 - [Experiment 3: Publication — the tap goes live and pours a bottle](03-publication.md)
   — **Pass** (tap + trust + install pours the arm64_tahoe bottle from GitHub in
   5.4s; source fallback proven; zero relocation rewrites; quarantine-free)
+
+## Conclusion
+
+**The goal is met.** Nutorch installs like a normal package:
+
+```bash
+brew tap nutorch/nutorch
+brew trust nutorch/nutorch   # brew 6.0+ requires trusting third-party taps
+brew install nutorch
+```
+
+On a bottled platform (arm64_tahoe today) that pours prebuilt binaries from a
+GitHub Release in ~5 seconds — no Python venv, no Rust toolchain, no checkout.
+Unbottled macOS versions fall back to a ~1-minute source build from the pinned
+release tarball, with brew installing rust itself.
+
+What the three experiments established, in order:
+
+1. **The relocatable substrate** (Exp 1): one install layout (`bin/` +
+   `libexec/libtorch/lib/` + `share/nutorch/`) served by a third baked
+   `@loader_path` rpath; version 0.1.0 stamped with a git-sha fallback; the
+   measured 4-dylib closure (libtorch, libtorch_cpu, libc10, and the
+   transitively-required libomp); `bootstrap.sh`/`install.sh` replacing the
+   Cargo.toml folklore.
+2. **The formula** (Exp 2): libtorch vendored at install time from the
+   hash-pinned PyPI wheel (staged whole for the build, slimmed to the 4-dylib
+   subset in the keg); proven hermetically via a local tap before anything was
+   published; brew 6.0's no-loose-formulae rule absorbed.
+3. **Publication** (Exp 3): tag v0.1.0; the source tarball as a hash-pinned
+   Release asset (not GitHub's regenerable `/archive/` tarballs); the
+   `nutorch/homebrew-nutorch` tap; a bottle whose JSON showed ZERO install-name
+   rewrites — the rpath design vindicated end to end; the brew-6.0 tap-trust
+   gate discovered by review and made part of the documented install; Gatekeeper
+   answered (ad-hoc linker signatures, no quarantine attrs, no prompts).
+
+Design questions 1–5 all settled (layout shared by keg and manual install;
+4-dylib subset; `CARGO_PKG_VERSION` + git sha, reported by `--version` and
+`daemon status`; separate tap repo updated manually per release; quarantine a
+non-issue). Recorded follow-ups, operational not architectural: CI bottling for
+more macOS versions, a release-cutting script to mechanize Exp 3's hand-executed
+order, and crates.io source publication for discoverability.
