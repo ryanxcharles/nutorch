@@ -94,3 +94,46 @@ nothing.
 
 **Pass** = all five. **Fail** = the fresh-session proof needs ANY user config,
 or brew link fights the stub.
+
+## Result
+
+**Result:** Pass
+
+`brew install nutorch` now seats the module in Nushell by itself — proven by a
+fresh session that was never configured.
+
+- **The formula writes the stub**: `share/nushell/vendor/autoload/nutorch.nu`
+  containing `use "/opt/homebrew/opt/nutorch/share/nutorch/nutorch.nu" *` — the
+  version-stable opt path. The `test do` block asserts the stub exists
+  (GPU-free; Nushell itself stays out of the formula's dependencies).
+- **The zero-config proof, end to end on this machine**: hand stub removed;
+  `dist/nutorch.rb` temp-copied over the local tap;
+  `brew reinstall
+  --build-from-source` (29s — the stub is install-time output,
+  so the pinned v0.1.0 tarball needed no re-release); the stub came out
+  BREW-LINKED (a symlink into the keg, not a loose file); then a fresh
+  `nu -c "nutorch tensor '[1,2]' | nutorch value"` printed `[1.0,2.0]` with zero
+  `use` typed and zero config edited. `brew test` green with the new assertion.
+  Local tap reverted to git-clean; the published formula on GitHub still carries
+  no stub (next release, per the spine).
+- **Bonus from the rebuild**: the earlier hand-applied CLI symlinks (the issue's
+  first-draft side effect) were replaced by brew-managed ones — `bin/nutorch` is
+  now a proper keg-linked binstub; no rogue files remain anywhere.
+- **From-source fallback**: `install.sh` now PRINTS the user-autoload one-liner
+  (never writes user config); the printed line was executed once against a
+  scratch dir and sources clean.
+- **Docs**: the Nushell page leads with "Homebrew installs: there is nothing to
+  set up," explains the mechanism in one parenthesis, and keeps the manual
+  `use`/user-autoload fallback for non-brew Nushell builds; the README's Nushell
+  section carries the autoload clause.
+- **Gates**: website build + check:content + check:links + check:ops-ref green;
+  dprint clean; zero `.rs` diffs; `v1/` untouched.
+
+## Conclusion
+
+The goal's exact sentence is now true: open a new Nushell, type
+`nutorch tensor '[1,2]'`, and it works — with the only `use` statement living in
+a file the package owns. The prefix-relative contract held exactly as the spine
+argued (both sides derive from `HOMEBREW_PREFIX`), and the fallback story is
+documented for everyone outside it. The published tap picks the stub up with the
+next release, alongside the MIT metadata and the CLI symlink.

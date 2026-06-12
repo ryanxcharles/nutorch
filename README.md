@@ -103,9 +103,10 @@ storage is invisible to it.
 
 ## Nushell
 
-A generated module gives Nushell native structured data over the same daemon
-(`torch nu-module | save -f nutorch.nu` regenerates it; a current copy is
-committed at the repo root):
+A generated module gives Nushell native structured data over the same daemon —
+and with a Homebrew install it AUTOLOADS: new Nushell sessions have `nutorch`
+commands with zero setup (`torch nu-module | save -f nutorch.nu` regenerates the
+module; a current copy is committed at the repo root):
 
 ```nu
 use nutorch.nu *

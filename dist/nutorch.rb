@@ -46,6 +46,12 @@ class Nutorch < Formula
       (libexec/"libtorch/lib").install wheel_stage/"torch/lib/#{dylib}"
     end
     pkgshare.install "nutorch.nu"
+    # Zero-config Nushell: nu sources every .nu file in its vendor
+    # autoload dirs, and brew-built nu pins that list to HOMEBREW_PREFIX.
+    # The opt path stays valid across upgrades.
+    (share/"nushell/vendor/autoload/nutorch.nu").write <<~EOS
+      use "#{opt_pkgshare}/nutorch.nu" *
+    EOS
   end
 
   test do
@@ -55,5 +61,6 @@ class Nutorch < Formula
     assert_match "nutorch #{version}", shell_output("#{bin}/nutorch --version")
     ops = JSON.parse(shell_output("#{bin}/torch ops --json"))
     assert ops.length > 100, "op table suspiciously small"
+    assert_path_exists share/"nushell/vendor/autoload/nutorch.nu"
   end
 end

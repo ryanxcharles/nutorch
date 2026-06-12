@@ -11,17 +11,32 @@ return to native Nushell values — no JSON wrangling.
 
 ## Setup
 
-A current copy of `nutorch.nu` ships in the repo root (and in the Homebrew keg
-at `$(brew --prefix)/share/nutorch/nutorch.nu`); regenerate it any time with:
+**If you installed nutorch with Homebrew, there is nothing to set up.** The
+formula ships a vendor-autoload stub, Nushell sources it at startup, and
+`nutorch` commands are simply there in every new session — no `use` line, no
+`config.nu` edit. (Mechanism: Nushell autoloads every `.nu` file in
+`$nu.vendor-autoload-dirs`, and brew-built Nushell scans
+`$(brew --prefix)/share/nushell/vendor/autoload`.)
+
+The manual fallback — for from-source installs, or a Nushell that was not
+installed by Homebrew (cargo, MacPorts, nightly builds) and so may not scan the
+brew prefix:
+
+```nu
+# one-time: autoload in every session
+mkdir ~/.config/nushell/autoload
+'use "/opt/homebrew/share/nutorch/nutorch.nu" *'
+  | save ~/.config/nushell/autoload/nutorch.nu
+
+# or just this session
+use /opt/homebrew/share/nutorch/nutorch.nu *
+```
+
+A current copy of `nutorch.nu` also ships in the repo root; regenerate it any
+time with:
 
 ```nu
 torch nu-module | save -f nutorch.nu
-```
-
-Then:
-
-```nu
-use nutorch.nu *
 ```
 
 ## Structured data in and out

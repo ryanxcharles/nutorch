@@ -29,5 +29,7 @@ cp nutorch.nu "$PREFIX/share/nutorch/nutorch.nu"
 echo "installed to $PREFIX"
 echo "  binaries:   $PREFIX/bin (add to PATH)"
 echo "  nushell:    use $PREFIX/share/nutorch/nutorch.nu *"
+echo "  nushell autoload (optional, zero-setup sessions):"
+echo "    mkdir -p ~/.config/nushell/autoload && echo 'use \"$PREFIX/share/nutorch/nutorch.nu\" *' > ~/.config/nushell/autoload/nutorch.nu"
 "$PREFIX/bin/torch" --version
 "$PREFIX/bin/nutorch" --version
