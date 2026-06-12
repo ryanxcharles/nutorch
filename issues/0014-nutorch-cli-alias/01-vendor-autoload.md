@@ -1,0 +1,96 @@
++++
+[implementer]
+agent = "claude-code"
+model = "claude-fable-5"
+
+[review]
+waived = "user decision 2026-06-12: no adversarial review for issue 0014"
++++
+
+# Experiment 1: The vendor-autoload stub
+
+## Description
+
+`brew install nutorch` makes `nutorch` work in every new Nushell session with
+zero user configuration. The mechanism is Nushell's vendor autoload: Nushell
+sources every `.nu` file in `$nu.vendor-autoload-dirs` at startup, and the
+brew-built Nushell pins that list to the same `HOMEBREW_PREFIX` every formula
+installs into — the prefix-relative contract recorded in the issue spine. The
+formula ships a one-line stub there; the stub `use`s the module; the user types
+nothing.
+
+**Decisions, made here:**
+
+1. **The formula writes the stub at install time** (it is not in the source
+   tarball — `install` generates it):
+   ```ruby
+   (share/"nushell/vendor/autoload/nutorch.nu").write <<~EOS
+     use "#{opt_pkgshare}/nutorch.nu" *
+   EOS
+   ```
+   `opt_pkgshare` (`$(brew --prefix)/opt/nutorch/share/nutorch`) is the
+   version-stable path brew maintains across upgrades — the stub never goes
+   stale on version bumps, and works even while the keg is unlinked. The
+   `test do` block gains an existence assertion for the stub (GPU-free, no
+   Nushell dependency — actually RUNNING Nushell stays out of the formula test;
+   the live gate below covers behavior).
+2. **The end-to-end proof is a real reinstall on this machine**: remove the
+   hand-placed stub from the previous session (it would collide with brew's link
+   step), temp-copy `dist/nutorch.rb` over the local tap's formula (uncommitted,
+   never pushed),
+   `brew reinstall --build-from-source
+   nutorch/nutorch/nutorch` (the install
+   method runs with the NEW formula against the pinned v0.1.0 tarball — the stub
+   is install-time output, so no new release is needed to prove it), then
+   `nu -c "nutorch tensor
+   '[1,2]' | nutorch value"` in a fresh
+   non-interactive Nushell with a private TMPDIR. The local tap file is reverted
+   afterward (tap git-clean; published tap untouched until the next release, per
+   the spine).
+3. **From-source installs get the documented fallback, not an imposed one**:
+   `install.sh` PRINTS the one-liner for `$nu.user-autoload-dirs`
+   (`~/.config/nushell/autoload/nutorch.nu` by default) instead of writing into
+   the user's config — an installer that edits shell config uninvited is the
+   wrong kind of magic. The hint is one echo line.
+4. **Docs say which mechanism applies when** (the spine's fallback question):
+   the Nushell docs page leads with "Homebrew installs: there is nothing to set
+   up" and keeps the manual `use` (config.nu or user-autoload file) as the
+   fallback for from-source installs and non-brew Nushell builds
+   (cargo/MacPorts/nightly — they may not scan the brew prefix; pre-autoload
+   Nushell versions lack the mechanism entirely). The README's Nushell section
+   gets one clause.
+5. **The hand-placed stub from the earlier session is RETIRED by this
+   experiment**: deleted before the reinstall, replaced by the brew-managed
+   keg-linked file — no rogue files left for a future `brew link` to fight.
+
+## Changes
+
+1. **`dist/nutorch.rb`**: the stub write in `install`; the existence assertion
+   in `test do`.
+2. **`scripts/install.sh`**: one echo line hinting the user-autoload one-liner.
+3. **`website/src/content/docs/nushell.md`**: setup section reframed (autoload
+   first, manual fallback second); **`README.md`**: one clause.
+4. **Local machine**: hand stub removed; brew-managed stub in its place via the
+   reinstall.
+5. **Published tap untouched** (next release); no Rust; no `v1/`.
+
+## Verification
+
+1. **The zero-config proof**: after the reinstall, a FRESH
+   `nu -c "nutorch
+   tensor '[1,2]' | nutorch value"` prints `[1.0,2.0]` with
+   no `use` typed and no config edited; `nu -c "nutorch daemon stop"` cleans up.
+   The stub exists at
+   `$(brew --prefix)/share/nushell/vendor/autoload/nutorch.nu`, brew-linked (a
+   symlink into the keg, not a loose file), and references the `opt` path.
+2. **brew test green** with the new assertion (temp-copied formula).
+3. **Tap hygiene**: local tap git-clean after the revert; the raw published
+   formula on GitHub still has no stub (unchanged until next release).
+4. **install.sh hint**: present in output; the printed one-liner is valid syntax
+   (executed once against a scratch user-autoload dir via `XDG_CONFIG_HOME`
+   override or equivalent, then removed).
+5. **Docs/site gates**: website build, `check:content`, `check:links` green;
+   dprint clean on touched files; no Rust diffs.
+
+**Pass** = all five. **Fail** = the fresh-session proof needs ANY user config,
+or brew link fights the stub.

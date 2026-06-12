@@ -66,6 +66,10 @@ Open questions for the experiment design:
 - The published tap and bottle pick the stub up with the next release (same
   precedent as the MIT metadata and the CLI symlink).
 
+## Experiments
+
+- [Experiment 1: The vendor-autoload stub](01-vendor-autoload.md) — **Designed**
+
 ## Scope
 
 In: the vendor-autoload stub in `dist/nutorch.rb`; whatever `install.sh` parity
