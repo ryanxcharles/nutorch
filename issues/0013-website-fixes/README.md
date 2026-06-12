@@ -52,6 +52,8 @@ fixes and reserved "other things I may want to fix."
   (name-vs-code table applied across titles, wordmark, OG, and prose; the new
   brand gate caught generated-summary violations the inventory missed; fences
   byte-untouched)
+- [Experiment 7: No dev toolbar, ever](07-no-dev-toolbar.md) — **Pass** (one
+  config line, project-level; dev HTML asserted toolbar-free)
 
 ## Background
 

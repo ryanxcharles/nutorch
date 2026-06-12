@@ -6,6 +6,9 @@ import { defineConfig } from "astro/config";
 export default defineConfig({
   output: "static",
   site: "https://nutorch.com",
+  // The dev toolbar is dev-server-only (never in builds), and unwanted
+  // even there.
+  devToolbar: { enabled: false },
   integrations: [
     sitemap({
       // /docs renders the same content as /docs/getting-started/ (which
