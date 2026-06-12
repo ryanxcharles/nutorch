@@ -1,76 +1,68 @@
 +++
-status = "closed"
+status = "open"
 opened = "2026-06-12"
-closed = "2026-06-12"
 +++
 
-# Issue 14: `nutorch` on the command line
+# Issue 14: `nutorch` in Nushell, with nothing to type
 
 ## Goal
 
-`nutorch` works as a CLI command everywhere `torch` does — same binary, both
-names. The project is CALLED nutorch; a user who types its name should get the
-tool.
+`nutorch` commands work in Nushell out of the box — no `use nutorch.nu *` at the
+start of every session. Open a new Nushell, type `nutorch tensor '[1,2]'`, and
+it works.
+
+No adversarial review for this issue (user decision, 2026-06-12) — experiments
+run design → plan commit → implement → result commit, with verification carrying
+the weight.
 
 ## Background
 
-Today the surface is split: the binary is `torch` (PyTorch fidelity — the
-muscle-memory name), while `nutorch` exists only as the Nushell module namespace
-(`use nutorch.nu *` → `nutorch tensor`, …). Outside Nushell, `nutorch` is
-command-not-found. The user hit exactly this confusion (2026-06-12), compounded
-by a stale v1 plugin registration shadowing `torch` inside Nushell (now
-removed).
+The v2 Nushell story is the generated module `nutorch.nu`: rich wrappers
+(`nutorch tensor`, `nutorch mm`, …) that take and return native Nushell values
+and call `^torch` underneath. But a module only exists in scope after
+`use nutorch.nu *` — which today must be typed (or put in `config.nu`) by hand.
+The user's actual request was zero-setup availability in Nushell.
 
-The client locates its daemon as a SIBLING of its own executable
-(`torch-cli/src/main.rs`: `current_exe().parent().join("nutorchd")`, with
-`NUTORCHD_BIN` as override) — any aliasing mechanism must keep that working.
+(A first version of this issue misread the request as "make `nutorch` a CLI name
+in every shell" and shipped a `nutorch → torch` symlink through `install.sh` and
+the formula before being corrected. That experiment record was removed at user
+direction; the symlink changes themselves remain in the tree and in history —
+harmless, and unrelated to this goal.)
 
 ## Analysis
 
-Two mechanisms considered:
+Two mechanisms, not mutually exclusive:
 
-1. **A second `[[bin]]` in torch-cli** — produces a real duplicate binary. Costs
-   a second copy of the client in every install and keg for zero behavioral
-   difference.
-2. **A symlink at install time** (`nutorch` → `torch`) — the standard Unix
-   answer (`python3`/`python`, `vim`/`vi`). Same directory, so the sibling
-   daemon lookup is unaffected whether or not the OS resolves the link; nothing
-   in the client reads `argv[0]`.
+1. **User-level**: one line in `config.nu` —
+   `use /opt/homebrew/share/nutorch/nutorch.nu *`. Works today, but it is
+   per-user setup: exactly the thing the goal wants to eliminate.
+2. **Package-level (the real fix): Nushell vendor autoload.** Nushell sources
+   every `.nu` file in `$nu.vendor-autoload-dirs` at startup —
+   `$(brew --prefix)/share/nushell/vendor/autoload` is on that list for
+   brew-installed Nushell. This is how starship, zoxide, and carapace ship
+   zero-config Nushell integration. The nutorch formula installs a one-line stub
+   there (`use ".../share/nutorch/nutorch.nu" *`), and `brew install nutorch`
+   makes `nutorch` work in every new Nushell session with no config edit.
 
-Symlink wins. It lands in: `scripts/install.sh` (from-source installs),
-`dist/nutorch.rb` (`bin.install_symlink` — brew links it into
-`$(brew --prefix)/bin` like any binstub), and the docs that enumerate what gets
-installed.
+Open questions for the experiment design:
 
-Inside Nushell, after `use nutorch.nu *`, the module's `nutorch` commands shadow
-the external — which is correct: the module IS the richer Nushell client, and it
-calls `^torch` underneath.
-
-## Experiments
-
-- [Experiment 1: The symlink](01-the-symlink.md) — **Pass** (nutorch → torch in
-  install.sh, the formula, and the live machine; sibling daemon spawn proven
-  through the link; zero Rust changes)
-
-## Conclusion
-
-**The goal is met in one experiment.** `nutorch` is a symlink to `torch` in
-every install path the project owns: `install.sh` (proven end to end into a temp
-prefix), `dist/nutorch.rb` (`bin.install_symlink` + a GPU-free test assertion),
-and the user's live brew install (hand-applied keg + prefix links, official from
-the next release). The sibling daemon lookup survived the aliasing in every
-layout, exactly as the design review verified it would, and zero Rust changes
-were needed. The published tap and bottle pick the link up with the next tagged
-release — the same recorded follow-up that carries the MIT license metadata.
+- The exact autoload-dir contract on this machine's Nushell version (verify
+  `$nu.vendor-autoload-dirs` includes the brew prefix path; verify a sourced
+  `use … *` at autoload time exports into the session scope).
+- `install.sh` parity: from-source installs should get the same behavior where
+  reasonable (the prefix's autoload dir is only consulted if it is on the user's
+  autoload path — may reduce to a documented `config.nu` line for non-brew
+  installs).
+- The published tap and bottle pick the stub up with the next release (same
+  precedent as the MIT metadata and the CLI symlink).
 
 ## Scope
 
-In: the symlink in `install.sh` and `dist/nutorch.rb`; docs touch
-(install-from-source page, getting-started/README one-liners where the binary
-names are listed); a locally created symlink so the user's existing brew install
-gains `nutorch` immediately.
+In: the vendor-autoload stub in `dist/nutorch.rb`; whatever `install.sh` parity
+is reasonable; docs (Nushell page: replace the manual `use` framing with "it's
+just there" + the manual line as fallback); local hand-applied stub so the
+user's machine gets the behavior now.
 
-Out (recorded): updating the published tap formula and re-bottling — the
-existing v0.1.0 bottle cannot grow a symlink retroactively; the tap picks the
-change up with the NEXT release (same precedent as the license metadata);
-argv[0]-based behavior differences (none exist, none added).
+Out (recorded): republishing the tap / re-bottling before the next release;
+reverting the issue's earlier CLI-symlink side effect (separate concern, the
+user has not asked); any plugin mechanism (v1's dead end).
