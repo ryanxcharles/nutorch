@@ -115,8 +115,10 @@ formula test staying GPU-free.
   suggestion — nothing new. Published tap untouched, as scoped.
 - **The live machine**: keg symlink + prefix symlink created by hand; `torch`
   made a tensor, `nutorch daemon status` answered from the SAME daemon (same
-  socket, same binary), `nutorch daemon stop` stopped it. Recorded: these two
-  links are brew-untracked until the next release's upgrade replaces them.
+  socket, same binary), `nutorch daemon stop` stopped it. Recorded: the keg link
+  is visible to `brew list` but is not part of the install receipt — both links
+  are hand-applied, orphaned by `brew uninstall`, and official only from the
+  next release's upgrade.
 - **Docs**: install-from-source page and README each carry one line naming both
   CLI names; `torch` stays canonical in all examples.
 - **Gates**: website build + check:content + check:links green; dprint clean;
