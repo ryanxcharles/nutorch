@@ -7,11 +7,14 @@ opened = "2026-06-11"
 
 ## Goal
 
-A **beautiful**, complete documentation website at **nutorch.com**: the pitch,
+A **beautiful**, complete documentation website for **nutorch.com**: the pitch,
 the three-command install, and full documentation of everything nutorch does —
 tensors and handles, the daemon, autograd, neural networks, the Nushell module,
 and a reference for all 185 ops — built on the nutorch brand (the green nautilus
-shell with the flame) and deployed as a static site on Cloudflare.
+shell with the flame) as a static Astro site, **built and verified locally**.
+Deployment (Cloudflare Pages + the nutorch.com domain) is a SEPARATE future
+issue — this issue ends with a production-quality `dist/` and a local preview,
+nothing outward-facing.
 
 Beauty is a first-class requirement, not a nice-to-have. The bar is: a stranger
 landing on nutorch.com immediately understands what nutorch is, wants it, and
@@ -112,8 +115,9 @@ nutorch/website/              ← lives in THIS repo (like termsurf)
   free/census, import/export); Autograd; Neural Networks (modules, optimizers,
   training loops, safetensors); Nushell (the module, structured data); Ops
   Reference (generated); plus install-from-source.
-- **Deployment**: Cloudflare Pages with nutorch.com as the custom domain (DNS on
-  Cloudflare). Static output — no Workers, no adapter.
+- **Deployment-ready, not deployed**: static output (no Workers, no adapter),
+  designed for Cloudflare Pages later — but this issue is local-only.
+  Verification is `astro build` + `astro preview` (or serving `dist/`).
 
 ## Design Questions (settled per-experiment)
 
@@ -127,20 +131,17 @@ nutorch/website/              ← lives in THIS repo (like termsurf)
 3. **Logo asset pipeline**: termsurf-style sharp script (favicon, sizes, OG
    image) from the 820px sources; whether a vector/SVG redraw is worth it
    (recorded follow-up if so).
-4. **Domain wiring**: nutorch.com nameservers/CNAME → Cloudflare Pages custom
-   domain — sequenced like issue 0011's outward-facing steps (designed,
-   reviewed, then executed).
-5. **Versioned docs?** No — one version, tracking main (0.1.x); revisit when
+4. **Versioned docs?** No — one version, tracking main (0.1.x); revisit when
    there are users on old versions.
 
 ## Scope
 
 In: the Astro site under `website/`; brand/design system from the logo; landing
 page; the documentation sections above; the generated ops reference; search,
-sitemap, OG tags; logo asset pipeline; Cloudflare Pages deployment; nutorch.com
-domain wiring; README pointer to the site.
+sitemap, OG tags; logo asset pipeline; a clean local build and preview.
 
-Out (recorded): blog/RSS (keypears-style — possible follow-up); versioned docs;
-analytics; interactive in-browser demos (no daemon in a browser); Starlight or
-any docs framework; CI auto-deploy (manual `bun run deploy` first, like
-termsurf).
+Out (recorded): **Cloudflare Pages deployment and nutorch.com domain wiring —
+the next issue** (user decision: this issue is local-only); blog/RSS
+(keypears-style — possible follow-up); versioned docs; analytics; interactive
+in-browser demos (no daemon in a browser); Starlight or any docs framework; CI
+auto-deploy.
