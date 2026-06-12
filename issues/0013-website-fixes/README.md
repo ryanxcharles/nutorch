@@ -38,6 +38,8 @@ fixes and reserved "other things I may want to fix."
 - [Experiment 2: Apache → MIT](02-mit-license.md) — **Pass** (MIT everywhere
   live: LICENSE, 3 manifests, both formula copies incl. the pushed tap, footer,
   README; the grep gate caught an AGENTS.md reference the inventory missed)
+- [Experiment 3: The hero rework — show, don't tell](03-hero-rework.md) —
+  **Designed**
 
 ## Background
 
