@@ -8,6 +8,11 @@ b=$(torch tensor '[4,5,6]')
 torch add $a $b | torch value
 # [5.0,7.0,9.0]   computed on the GPU`;
 
+const heroDemoNu = `let a = ([1 2 3] | nutorch tensor)
+let b = ([4 5 6] | nutorch tensor)
+$a | nutorch add $b | nutorch value
+# [5.0, 7.0, 9.0] — a native list, on the GPU`;
+
 const bashDemo = `m=$(torch randn '[3,3]')
 torch mm $m $m | torch mean | torch value
 # matrix product, then mean — one pipeline`;
@@ -79,7 +84,39 @@ const features = [
           rest.
         </p>
         <div class="mt-6 text-left">
-          <CodeBlock code={heroDemo} lang="bash" />
+          <div class="mb-2 flex gap-1.5" role="tablist" aria-label="Shell">
+            <button
+              id="hero-tab-posix"
+              role="tab"
+              aria-selected="true"
+              aria-controls="hero-panel-posix"
+              data-shell="posix"
+              class="hero-shell-tab rounded-md border border-border px-2.5 py-1 font-mono text-xs text-muted transition-colors"
+            >bash / zsh</button>
+            <button
+              id="hero-tab-nu"
+              role="tab"
+              aria-selected="false"
+              aria-controls="hero-panel-nu"
+              data-shell="nu"
+              class="hero-shell-tab rounded-md border border-border px-2.5 py-1 font-mono text-xs text-muted transition-colors"
+            >Nushell</button>
+          </div>
+          <div
+            id="hero-panel-posix"
+            role="tabpanel"
+            aria-labelledby="hero-tab-posix"
+          >
+            <CodeBlock code={heroDemo} lang="bash" />
+          </div>
+          <div
+            id="hero-panel-nu"
+            role="tabpanel"
+            aria-labelledby="hero-tab-nu"
+            hidden
+          >
+            <CodeBlock code={heroDemoNu} lang="nu" />
+          </div>
         </div>
         <p class="mt-3 text-sm text-muted">
           PyTorch semantics on Apple-silicon Metal — from bash, zsh, fish, or
@@ -162,6 +199,31 @@ const features = [
 </Base>
 
 <script>
+  // Hero shell tabs: swap panels, persist the visitor's shell choice.
+  const shellTabs = document.querySelectorAll<HTMLButtonElement>("[data-shell]");
+  const applyShell = (shell: string) => {
+    for (const tab of shellTabs) {
+      const active = tab.dataset.shell === shell;
+      tab.setAttribute("aria-selected", String(active));
+      document
+        .getElementById(`hero-panel-${tab.dataset.shell}`)
+        ?.toggleAttribute("hidden", !active);
+    }
+  };
+  let savedShell = null;
+  try {
+    savedShell = localStorage.getItem("hero-shell");
+  } catch {}
+  if (savedShell === "nu" || savedShell === "posix") applyShell(savedShell);
+  for (const tab of shellTabs) {
+    tab.addEventListener("click", () => {
+      applyShell(tab.dataset.shell!);
+      try {
+        localStorage.setItem("hero-shell", tab.dataset.shell!);
+      } catch {}
+    });
+  }
+
   const button = document.getElementById("copy-install");
   button?.addEventListener("click", async () => {
     const text = button.dataset.copy;

@@ -214,6 +214,13 @@ body {
   margin: 2rem 0;
 }
 
+/* Hero shell tabs: active tab keyed on aria-selected (set by JS). */
+.hero-shell-tab[aria-selected="true"] {
+  color: var(--fg);
+  border-color: var(--primary);
+  background-color: var(--surface-edge);
+}
+
 /* Soft brand glow behind the hero shell; reads in both modes. */
 .hero-glow {
   background: radial-gradient(

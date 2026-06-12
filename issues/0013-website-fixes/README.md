@@ -45,6 +45,9 @@ fixes and reserved "other things I may want to fix."
 - [Experiment 4: The three-state theme — system / light / dark](04-three-state-theme.md)
   — **Pass** (two-layer state; system mode follows an emulated OS flip live with
   no reload; pinned modes ignore it; 14-assertion CDP gate `check:theme`)
+- [Experiment 5: Hero shell tabs — bash/zsh and Nushell](05-hero-shell-tabs.md)
+  — **Pass** (the nu example reproduced via the discriminating explicit-use form
+  before display; CDP-proven tab swap + persistence in both modes)
 
 ## Background
 
