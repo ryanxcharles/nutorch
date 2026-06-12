@@ -1141,8 +1141,12 @@ export def --wrapped "nutorch nn" [...rest: string]: nothing -> any {
 }
 
 # Run a module on a piped tensor handle.
-export def "nutorch forward" [module: string]: string -> string {
-  $in | ^torch forward $module | str trim
+export def "nutorch forward" [...rest: string]: any -> string {
+  # Dual input (issue 0016): `$x | nutorch forward $m` or
+  # `nutorch forward $m $x` — the CLI's grammar fills missing slots.
+  let __in = $in
+  let __out = if $__in == null { ^torch forward ...$rest } else { $__in | ^torch forward ...$rest }
+  $__out | str trim
 }
 
 # One optimizer step (piped optimizer handle or argument).
@@ -1163,24 +1167,33 @@ fn generate_nu_module() -> String {
         let mut signature = Vec::new();
         let mut body_args = Vec::new();
 
-        // Tensor slots beyond the piped first one become positionals.
+        // Dual Input Pattern (issue 0016): tensor-taking ops delegate the
+        // stdin-prefix grammar to the CLI — ALL positionals (tensor slots
+        // and params alike) ride one rest parameter, forwarded in order;
+        // `$in`, when present, is piped and fills the leftmost missing
+        // slots CLI-side. Variadic ops keep their issue-0010 shape (they
+        // were dual already); zero-tensor ops take typed named positionals
+        // since nothing shifts.
+        let delegated = matches!(spec.tensors, Arity::Exactly(n) if n >= 1);
         match spec.tensors {
-            Arity::Exactly(n) => {
-                for slot in 2..=n {
-                    signature.push(format!("t{slot}: string"));
-                    body_args.push(format!("$t{slot}"));
-                }
+            Arity::Exactly(n) if n >= 1 => {
+                signature.push("...rest: any".to_string());
+                body_args.push("...$__rest".to_string());
             }
+            Arity::Exactly(_) => {}
             Arity::AtLeast(_) => {
                 signature.push("...rest: string".to_string());
                 body_args.push("...$rest".to_string());
             }
         }
-        // Positional params (after tensor slots, per the CLI grammar).
-        for param in spec.params.iter().filter(|p| p.positional) {
-            let ty = nu_type(param.kind);
-            signature.push(format!("{}: {ty}", param.name));
-            body_args.push(nu_positional_expr(param.name, param.kind));
+        // Positional params: folded into the rest parameter for delegated
+        // ops (the CLI parses them); typed names otherwise.
+        if !delegated {
+            for param in spec.params.iter().filter(|p| p.positional) {
+                let ty = nu_type(param.kind);
+                signature.push(format!("{}: {ty}", param.name));
+                body_args.push(nu_positional_expr(param.name, param.kind));
+            }
         }
         // Flags.
         let mut flag_lines = Vec::new();
@@ -1208,7 +1221,7 @@ fn generate_nu_module() -> String {
 
         let piped = !matches!(spec.tensors, Arity::Exactly(0));
         let input_type = if piped {
-            if matches!(spec.tensors, Arity::AtLeast(_)) {
+            if matches!(spec.tensors, Arity::AtLeast(_)) || delegated {
                 "any"
             } else {
                 "string"
@@ -1223,14 +1236,27 @@ fn generate_nu_module() -> String {
             ResultKind::None => ("nothing", " | ignore"),
         };
 
-        out.push_str(&format!(
-            "\n# {}\nexport def \"nutorch {}\" [{}]: {} -> {} {{\n",
-            spec.summary,
-            spec.name,
-            signature.join(", "),
-            input_type,
-            output_type
-        ));
+        if delegated {
+            // The usage line preserves the arity the rest signature hides.
+            out.push_str(&format!(
+                "\n# {}\n# {}\nexport def \"nutorch {}\" [{}]: {} -> {} {{\n",
+                spec.summary,
+                spec.usage(),
+                spec.name,
+                signature.join(", "),
+                input_type,
+                output_type
+            ));
+        } else {
+            out.push_str(&format!(
+                "\n# {}\nexport def \"nutorch {}\" [{}]: {} -> {} {{\n",
+                spec.summary,
+                spec.name,
+                signature.join(", "),
+                input_type,
+                output_type
+            ));
+        }
         if !flag_lines.is_empty() {
             out.push_str("  mut args = []\n");
             out.push_str(&flag_lines.join("\n"));
@@ -1238,7 +1264,15 @@ fn generate_nu_module() -> String {
             body_args.push("...$args".to_string());
         }
         let invocation = format!("^torch {} {}", spec.name, body_args.join(" "));
-        let line = if piped {
+        let line = if delegated {
+            // Generic positional conversion (lists → compact JSON, the
+            // CLI's IntList form; everything else → string), then branch
+            // on $in: the CLI's stdin-prefix grammar fills the leftmost
+            // missing tensor slots and owns all arity validation.
+            format!(
+                "  let __rest = ($rest | each {{|a| if ($a | describe | str starts-with \"list\") {{ $a | to json -r }} else {{ $a | into string }} }})\n  let __in = $in\n  let __out = if $__in == null {{ {invocation} }} else {{ $__in | {invocation} }}\n  $__out{post}"
+            )
+        } else if piped {
             if matches!(spec.tensors, Arity::AtLeast(_)) {
                 // A piped LIST renders as table glyphs to externals —
                 // join explicitly (issue 0010 design review).

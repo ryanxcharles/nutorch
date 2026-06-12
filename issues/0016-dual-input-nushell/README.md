@@ -65,7 +65,9 @@ contract than bash.
 ## Experiments
 
 - [Experiment 1: Generator delegation — one grammar, two shells](01-generator-delegation.md)
-  — **Designed**
+  — **Pass** (173 wrappers regenerated incl. the prelude's forward; 11/11 parity
+  checks; CLI arity errors surface through the module; variadic and creation
+  wrappers byte-untouched)
 
 ## Scope
 

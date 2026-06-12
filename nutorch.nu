@@ -99,8 +99,12 @@ export def --wrapped "nutorch nn" [...rest: string]: nothing -> any {
 }
 
 # Run a module on a piped tensor handle.
-export def "nutorch forward" [module: string]: string -> string {
-  $in | ^torch forward $module | str trim
+export def "nutorch forward" [...rest: string]: any -> string {
+  # Dual input (issue 0016): `$x | nutorch forward $m` or
+  # `nutorch forward $m $x` — the CLI's grammar fills missing slots.
+  let __in = $in
+  let __out = if $__in == null { ^torch forward ...$rest } else { $__in | ^torch forward ...$rest }
+  $__out | str trim
 }
 
 # One optimizer step (piped optimizer handle or argument).
@@ -113,77 +117,121 @@ export def "nutorch step" [optimizer?: string]: any -> nothing {
 }
 
 # a + alpha*b (broadcasting; --alpha default 1)
-export def "nutorch add" [t2: string, --alpha: number]: string -> string {
+# usage: torch add <t1> <t2> [--alpha <Scalar>]
+export def "nutorch add" [...rest: any, --alpha: number]: any -> string {
   mut args = []
   if $alpha != null { $args = ($args | append ["--alpha" ($alpha | into string)]) }
-  $in | ^torch add $t2 ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch add ...$__rest ...$args } else { $__in | ^torch add ...$__rest ...$args }
+  $__out | str trim
 }
 
 # a - alpha*b (broadcasting; --alpha default 1)
-export def "nutorch sub" [t2: string, --alpha: number]: string -> string {
+# usage: torch sub <t1> <t2> [--alpha <Scalar>]
+export def "nutorch sub" [...rest: any, --alpha: number]: any -> string {
   mut args = []
   if $alpha != null { $args = ($args | append ["--alpha" ($alpha | into string)]) }
-  $in | ^torch sub $t2 ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch sub ...$__rest ...$args } else { $__in | ^torch sub ...$__rest ...$args }
+  $__out | str trim
 }
 
 # elementwise sine
-export def "nutorch sin" []: string -> string {
-  $in | ^torch sin  | str trim
+# usage: torch sin <t1>
+export def "nutorch sin" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch sin ...$__rest } else { $__in | ^torch sin ...$__rest }
+  $__out | str trim
 }
 
 # elementwise power (scalar or tensor exponent)
-export def "nutorch pow" [exponent: any]: string -> string {
-  $in | ^torch pow ($exponent | into string) | str trim
+# usage: torch pow <t1> <exponent>
+export def "nutorch pow" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch pow ...$__rest } else { $__in | ^torch pow ...$__rest }
+  $__out | str trim
 }
 
 # clamp into [min, max] (scalar or tensor bounds; one required)
-export def "nutorch clamp" [--min: any, --max: any]: string -> string {
+# usage: torch clamp <t1> [--min <HandleOrScalar>] [--max <HandleOrScalar>]
+export def "nutorch clamp" [...rest: any, --min: any, --max: any]: any -> string {
   mut args = []
   if $min != null { $args = ($args | append ["--min" ($min | into string)]) }
   if $max != null { $args = ($args | append ["--max" ($max | into string)]) }
-  $in | ^torch clamp ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch clamp ...$__rest ...$args } else { $__in | ^torch clamp ...$__rest ...$args }
+  $__out | str trim
 }
 
 # sum over all elements, or along --dim
-export def "nutorch sum" [--dim: int, --keepdim]: string -> string {
+# usage: torch sum <t1> [--dim <Int>] [--keepdim]
+export def "nutorch sum" [...rest: any, --dim: int, --keepdim]: any -> string {
   mut args = []
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
   if $keepdim { $args = ($args | append "--keepdim") }
-  $in | ^torch sum ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch sum ...$__rest ...$args } else { $__in | ^torch sum ...$__rest ...$args }
+  $__out | str trim
 }
 
 # mean over all elements, or along --dim (float32, v1 fidelity)
-export def "nutorch mean" [--dim: int, --keepdim]: string -> string {
+# usage: torch mean <t1> [--dim <Int>] [--keepdim]
+export def "nutorch mean" [...rest: any, --dim: int, --keepdim]: any -> string {
   mut args = []
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
   if $keepdim { $args = ($args | append "--keepdim") }
-  $in | ^torch mean ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch mean ...$__rest ...$args } else { $__in | ^torch mean ...$__rest ...$args }
+  $__out | str trim
 }
 
 # elementwise equality (returns a Bool tensor)
-export def "nutorch eq" [t2: string]: string -> string {
-  $in | ^torch eq $t2 | str trim
+# usage: torch eq <t1> <t2>
+export def "nutorch eq" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch eq ...$__rest } else { $__in | ^torch eq ...$__rest }
+  $__out | str trim
 }
 
 # true if all elements are close (returns a JSON bool)
-export def "nutorch allclose" [t2: string, --rtol: number, --atol: number]: string -> any {
+# usage: torch allclose <t1> <t2> [--rtol <Float>] [--atol <Float>]
+export def "nutorch allclose" [...rest: any, --rtol: number, --atol: number]: any -> any {
   mut args = []
   if $rtol != null { $args = ($args | append ["--rtol" ($rtol | into string)]) }
   if $atol != null { $args = ($args | append ["--atol" ($atol | into string)]) }
-  $in | ^torch allclose $t2 ...$args | from json | __nutorch-restore
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch allclose ...$__rest ...$args } else { $__in | ^torch allclose ...$__rest ...$args }
+  $__out | from json | __nutorch-restore
 }
 
 # sort along --dim (default last); returns values and indices
-export def "nutorch sort" [--dim: int, --descending]: string -> list<string> {
+# usage: torch sort <t1> [--dim <Int>] [--descending]
+export def "nutorch sort" [...rest: any, --dim: int, --descending]: any -> list<string> {
   mut args = []
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
   if $descending { $args = ($args | append "--descending") }
-  $in | ^torch sort ...$args | lines
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch sort ...$__rest ...$args } else { $__in | ^torch sort ...$__rest ...$args }
+  $__out | lines
 }
 
 # matrix multiply of two 2-D tensors
-export def "nutorch mm" [t2: string]: string -> string {
-  $in | ^torch mm $t2 | str trim
+# usage: torch mm <t1> <t2>
+export def "nutorch mm" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch mm ...$__rest } else { $__in | ^torch mm ...$__rest }
+  $__out | str trim
 }
 
 # concatenate tensors along --dim (default 0)
@@ -212,559 +260,947 @@ export def "nutorch randn" [shape: list<int>, --dtype: string, --requires_grad]:
 }
 
 # elementwise absolute value
-export def "nutorch abs" []: string -> string {
-  $in | ^torch abs  | str trim
+# usage: torch abs <t1>
+export def "nutorch abs" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch abs ...$__rest } else { $__in | ^torch abs ...$__rest }
+  $__out | str trim
 }
 
 # elementwise arccosine
-export def "nutorch acos" []: string -> string {
-  $in | ^torch acos  | str trim
+# usage: torch acos <t1>
+export def "nutorch acos" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch acos ...$__rest } else { $__in | ^torch acos ...$__rest }
+  $__out | str trim
 }
 
 # elementwise inverse hyperbolic cosine
-export def "nutorch acosh" []: string -> string {
-  $in | ^torch acosh  | str trim
+# usage: torch acosh <t1>
+export def "nutorch acosh" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch acosh ...$__rest } else { $__in | ^torch acosh ...$__rest }
+  $__out | str trim
 }
 
 # elementwise arcsine
-export def "nutorch asin" []: string -> string {
-  $in | ^torch asin  | str trim
+# usage: torch asin <t1>
+export def "nutorch asin" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch asin ...$__rest } else { $__in | ^torch asin ...$__rest }
+  $__out | str trim
 }
 
 # elementwise inverse hyperbolic sine
-export def "nutorch asinh" []: string -> string {
-  $in | ^torch asinh  | str trim
+# usage: torch asinh <t1>
+export def "nutorch asinh" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch asinh ...$__rest } else { $__in | ^torch asinh ...$__rest }
+  $__out | str trim
 }
 
 # elementwise arctangent
-export def "nutorch atan" []: string -> string {
-  $in | ^torch atan  | str trim
+# usage: torch atan <t1>
+export def "nutorch atan" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch atan ...$__rest } else { $__in | ^torch atan ...$__rest }
+  $__out | str trim
 }
 
 # elementwise inverse hyperbolic tangent
-export def "nutorch atanh" []: string -> string {
-  $in | ^torch atanh  | str trim
+# usage: torch atanh <t1>
+export def "nutorch atanh" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch atanh ...$__rest } else { $__in | ^torch atanh ...$__rest }
+  $__out | str trim
 }
 
 # elementwise ceiling
-export def "nutorch ceil" []: string -> string {
-  $in | ^torch ceil  | str trim
+# usage: torch ceil <t1>
+export def "nutorch ceil" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch ceil ...$__rest } else { $__in | ^torch ceil ...$__rest }
+  $__out | str trim
 }
 
 # elementwise cosine
-export def "nutorch cos" []: string -> string {
-  $in | ^torch cos  | str trim
+# usage: torch cos <t1>
+export def "nutorch cos" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch cos ...$__rest } else { $__in | ^torch cos ...$__rest }
+  $__out | str trim
 }
 
 # elementwise hyperbolic cosine
-export def "nutorch cosh" []: string -> string {
-  $in | ^torch cosh  | str trim
+# usage: torch cosh <t1>
+export def "nutorch cosh" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch cosh ...$__rest } else { $__in | ^torch cosh ...$__rest }
+  $__out | str trim
 }
 
 # degrees to radians
-export def "nutorch deg2rad" []: string -> string {
-  $in | ^torch deg2rad  | str trim
+# usage: torch deg2rad <t1>
+export def "nutorch deg2rad" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch deg2rad ...$__rest } else { $__in | ^torch deg2rad ...$__rest }
+  $__out | str trim
 }
 
 # elementwise digamma
-export def "nutorch digamma" []: string -> string {
-  $in | ^torch digamma  | str trim
+# usage: torch digamma <t1>
+export def "nutorch digamma" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch digamma ...$__rest } else { $__in | ^torch digamma ...$__rest }
+  $__out | str trim
 }
 
 # elementwise error function
-export def "nutorch erf" []: string -> string {
-  $in | ^torch erf  | str trim
+# usage: torch erf <t1>
+export def "nutorch erf" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch erf ...$__rest } else { $__in | ^torch erf ...$__rest }
+  $__out | str trim
 }
 
 # elementwise complementary error function
-export def "nutorch erfc" []: string -> string {
-  $in | ^torch erfc  | str trim
+# usage: torch erfc <t1>
+export def "nutorch erfc" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch erfc ...$__rest } else { $__in | ^torch erfc ...$__rest }
+  $__out | str trim
 }
 
 # elementwise e^x
-export def "nutorch exp" []: string -> string {
-  $in | ^torch exp  | str trim
+# usage: torch exp <t1>
+export def "nutorch exp" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch exp ...$__rest } else { $__in | ^torch exp ...$__rest }
+  $__out | str trim
 }
 
 # elementwise 2^x
-export def "nutorch exp2" []: string -> string {
-  $in | ^torch exp2  | str trim
+# usage: torch exp2 <t1>
+export def "nutorch exp2" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch exp2 ...$__rest } else { $__in | ^torch exp2 ...$__rest }
+  $__out | str trim
 }
 
 # elementwise e^x - 1
-export def "nutorch expm1" []: string -> string {
-  $in | ^torch expm1  | str trim
+# usage: torch expm1 <t1>
+export def "nutorch expm1" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch expm1 ...$__rest } else { $__in | ^torch expm1 ...$__rest }
+  $__out | str trim
 }
 
 # elementwise floor
-export def "nutorch floor" []: string -> string {
-  $in | ^torch floor  | str trim
+# usage: torch floor <t1>
+export def "nutorch floor" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch floor ...$__rest } else { $__in | ^torch floor ...$__rest }
+  $__out | str trim
 }
 
 # elementwise fractional part
-export def "nutorch frac" []: string -> string {
-  $in | ^torch frac  | str trim
+# usage: torch frac <t1>
+export def "nutorch frac" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch frac ...$__rest } else { $__in | ^torch frac ...$__rest }
+  $__out | str trim
 }
 
 # elementwise modified Bessel function I0
-export def "nutorch i0" []: string -> string {
-  $in | ^torch i0  | str trim
+# usage: torch i0 <t1>
+export def "nutorch i0" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch i0 ...$__rest } else { $__in | ^torch i0 ...$__rest }
+  $__out | str trim
 }
 
 # elementwise log-gamma
-export def "nutorch lgamma" []: string -> string {
-  $in | ^torch lgamma  | str trim
+# usage: torch lgamma <t1>
+export def "nutorch lgamma" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch lgamma ...$__rest } else { $__in | ^torch lgamma ...$__rest }
+  $__out | str trim
 }
 
 # elementwise natural log
-export def "nutorch log" []: string -> string {
-  $in | ^torch log  | str trim
+# usage: torch log <t1>
+export def "nutorch log" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch log ...$__rest } else { $__in | ^torch log ...$__rest }
+  $__out | str trim
 }
 
 # elementwise log base 10
-export def "nutorch log10" []: string -> string {
-  $in | ^torch log10  | str trim
+# usage: torch log10 <t1>
+export def "nutorch log10" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch log10 ...$__rest } else { $__in | ^torch log10 ...$__rest }
+  $__out | str trim
 }
 
 # elementwise log(1+x)
-export def "nutorch log1p" []: string -> string {
-  $in | ^torch log1p  | str trim
+# usage: torch log1p <t1>
+export def "nutorch log1p" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch log1p ...$__rest } else { $__in | ^torch log1p ...$__rest }
+  $__out | str trim
 }
 
 # elementwise log base 2
-export def "nutorch log2" []: string -> string {
-  $in | ^torch log2  | str trim
+# usage: torch log2 <t1>
+export def "nutorch log2" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch log2 ...$__rest } else { $__in | ^torch log2 ...$__rest }
+  $__out | str trim
 }
 
 # elementwise logit (inverse sigmoid)
-export def "nutorch logit" []: string -> string {
-  $in | ^torch logit  | str trim
+# usage: torch logit <t1>
+export def "nutorch logit" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch logit ...$__rest } else { $__in | ^torch logit ...$__rest }
+  $__out | str trim
 }
 
 # elementwise negation
-export def "nutorch neg" []: string -> string {
-  $in | ^torch neg  | str trim
+# usage: torch neg <t1>
+export def "nutorch neg" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch neg ...$__rest } else { $__in | ^torch neg ...$__rest }
+  $__out | str trim
 }
 
 # radians to degrees
-export def "nutorch rad2deg" []: string -> string {
-  $in | ^torch rad2deg  | str trim
+# usage: torch rad2deg <t1>
+export def "nutorch rad2deg" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch rad2deg ...$__rest } else { $__in | ^torch rad2deg ...$__rest }
+  $__out | str trim
 }
 
 # elementwise 1/x
-export def "nutorch reciprocal" []: string -> string {
-  $in | ^torch reciprocal  | str trim
+# usage: torch reciprocal <t1>
+export def "nutorch reciprocal" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch reciprocal ...$__rest } else { $__in | ^torch reciprocal ...$__rest }
+  $__out | str trim
 }
 
 # elementwise max(x, 0)
-export def "nutorch relu" []: string -> string {
-  $in | ^torch relu  | str trim
+# usage: torch relu <t1>
+export def "nutorch relu" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch relu ...$__rest } else { $__in | ^torch relu ...$__rest }
+  $__out | str trim
 }
 
 # elementwise round to nearest
-export def "nutorch round" []: string -> string {
-  $in | ^torch round  | str trim
+# usage: torch round <t1>
+export def "nutorch round" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch round ...$__rest } else { $__in | ^torch round ...$__rest }
+  $__out | str trim
 }
 
 # elementwise 1/sqrt(x)
-export def "nutorch rsqrt" []: string -> string {
-  $in | ^torch rsqrt  | str trim
+# usage: torch rsqrt <t1>
+export def "nutorch rsqrt" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch rsqrt ...$__rest } else { $__in | ^torch rsqrt ...$__rest }
+  $__out | str trim
 }
 
 # elementwise sign (complex-aware)
-export def "nutorch sgn" []: string -> string {
-  $in | ^torch sgn  | str trim
+# usage: torch sgn <t1>
+export def "nutorch sgn" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch sgn ...$__rest } else { $__in | ^torch sgn ...$__rest }
+  $__out | str trim
 }
 
 # elementwise sigmoid
-export def "nutorch sigmoid" []: string -> string {
-  $in | ^torch sigmoid  | str trim
+# usage: torch sigmoid <t1>
+export def "nutorch sigmoid" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch sigmoid ...$__rest } else { $__in | ^torch sigmoid ...$__rest }
+  $__out | str trim
 }
 
 # elementwise sign
-export def "nutorch sign" []: string -> string {
-  $in | ^torch sign  | str trim
+# usage: torch sign <t1>
+export def "nutorch sign" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch sign ...$__rest } else { $__in | ^torch sign ...$__rest }
+  $__out | str trim
 }
 
 # elementwise normalized sinc
-export def "nutorch sinc" []: string -> string {
-  $in | ^torch sinc  | str trim
+# usage: torch sinc <t1>
+export def "nutorch sinc" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch sinc ...$__rest } else { $__in | ^torch sinc ...$__rest }
+  $__out | str trim
 }
 
 # elementwise hyperbolic sine
-export def "nutorch sinh" []: string -> string {
-  $in | ^torch sinh  | str trim
+# usage: torch sinh <t1>
+export def "nutorch sinh" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch sinh ...$__rest } else { $__in | ^torch sinh ...$__rest }
+  $__out | str trim
 }
 
 # elementwise square root
-export def "nutorch sqrt" []: string -> string {
-  $in | ^torch sqrt  | str trim
+# usage: torch sqrt <t1>
+export def "nutorch sqrt" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch sqrt ...$__rest } else { $__in | ^torch sqrt ...$__rest }
+  $__out | str trim
 }
 
 # elementwise x^2
-export def "nutorch square" []: string -> string {
-  $in | ^torch square  | str trim
+# usage: torch square <t1>
+export def "nutorch square" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch square ...$__rest } else { $__in | ^torch square ...$__rest }
+  $__out | str trim
 }
 
 # elementwise tangent
-export def "nutorch tan" []: string -> string {
-  $in | ^torch tan  | str trim
+# usage: torch tan <t1>
+export def "nutorch tan" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch tan ...$__rest } else { $__in | ^torch tan ...$__rest }
+  $__out | str trim
 }
 
 # elementwise hyperbolic tangent
-export def "nutorch tanh" []: string -> string {
-  $in | ^torch tanh  | str trim
+# usage: torch tanh <t1>
+export def "nutorch tanh" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch tanh ...$__rest } else { $__in | ^torch tanh ...$__rest }
+  $__out | str trim
 }
 
 # elementwise truncation toward zero
-export def "nutorch trunc" []: string -> string {
-  $in | ^torch trunc  | str trim
+# usage: torch trunc <t1>
+export def "nutorch trunc" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch trunc ...$__rest } else { $__in | ^torch trunc ...$__rest }
+  $__out | str trim
 }
 
 # softmax along --dim (float32)
-export def "nutorch softmax" [--dim: int]: string -> string {
+# usage: torch softmax <t1> [--dim <Int>]
+export def "nutorch softmax" [...rest: any, --dim: int]: any -> string {
   mut args = []
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
-  $in | ^torch softmax ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch softmax ...$__rest ...$args } else { $__in | ^torch softmax ...$__rest ...$args }
+  $__out | str trim
 }
 
 # log-softmax along --dim (float32)
-export def "nutorch log_softmax" [--dim: int]: string -> string {
+# usage: torch log_softmax <t1> [--dim <Int>]
+export def "nutorch log_softmax" [...rest: any, --dim: int]: any -> string {
   mut args = []
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
-  $in | ^torch log_softmax ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch log_softmax ...$__rest ...$args } else { $__in | ^torch log_softmax ...$__rest ...$args }
+  $__out | str trim
 }
 
 # replace NaN/inf (--nan/--posinf/--neginf)
-export def "nutorch nan_to_num" [--nan: number, --posinf: number, --neginf: number]: string -> string {
+# usage: torch nan_to_num <t1> [--nan <Float>] [--posinf <Float>] [--neginf <Float>]
+export def "nutorch nan_to_num" [...rest: any, --nan: number, --posinf: number, --neginf: number]: any -> string {
   mut args = []
   if $nan != null { $args = ($args | append ["--nan" ($nan | into string)]) }
   if $posinf != null { $args = ($args | append ["--posinf" ($posinf | into string)]) }
   if $neginf != null { $args = ($args | append ["--neginf" ($neginf | into string)]) }
-  $in | ^torch nan_to_num ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch nan_to_num ...$__rest ...$args } else { $__in | ^torch nan_to_num ...$__rest ...$args }
+  $__out | str trim
 }
 
 # elementwise product (broadcasting)
-export def "nutorch mul" [t2: string]: string -> string {
-  $in | ^torch mul $t2 | str trim
+# usage: torch mul <t1> <t2>
+export def "nutorch mul" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch mul ...$__rest } else { $__in | ^torch mul ...$__rest }
+  $__out | str trim
 }
 
 # elementwise true division (broadcasting)
-export def "nutorch div" [t2: string]: string -> string {
-  $in | ^torch div $t2 | str trim
+# usage: torch div <t1> <t2>
+export def "nutorch div" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch div ...$__rest } else { $__in | ^torch div ...$__rest }
+  $__out | str trim
 }
 
 # elementwise maximum (broadcasting)
-export def "nutorch maximum" [t2: string]: string -> string {
-  $in | ^torch maximum $t2 | str trim
+# usage: torch maximum <t1> <t2>
+export def "nutorch maximum" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch maximum ...$__rest } else { $__in | ^torch maximum ...$__rest }
+  $__out | str trim
 }
 
 # elementwise minimum (broadcasting)
-export def "nutorch minimum" [t2: string]: string -> string {
-  $in | ^torch minimum $t2 | str trim
+# usage: torch minimum <t1> <t2>
+export def "nutorch minimum" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch minimum ...$__rest } else { $__in | ^torch minimum ...$__rest }
+  $__out | str trim
 }
 
 # elementwise atan2(a, b) (broadcasting)
-export def "nutorch atan2" [t2: string]: string -> string {
-  $in | ^torch atan2 $t2 | str trim
+# usage: torch atan2 <t1> <t2>
+export def "nutorch atan2" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch atan2 ...$__rest } else { $__in | ^torch atan2 ...$__rest }
+  $__out | str trim
 }
 
 # elementwise C-style remainder (broadcasting)
-export def "nutorch fmod" [t2: string]: string -> string {
-  $in | ^torch fmod $t2 | str trim
+# usage: torch fmod <t1> <t2>
+export def "nutorch fmod" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch fmod ...$__rest } else { $__in | ^torch fmod ...$__rest }
+  $__out | str trim
 }
 
 # elementwise Python-style remainder (broadcasting)
-export def "nutorch remainder" [t2: string]: string -> string {
-  $in | ^torch remainder $t2 | str trim
+# usage: torch remainder <t1> <t2>
+export def "nutorch remainder" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch remainder ...$__rest } else { $__in | ^torch remainder ...$__rest }
+  $__out | str trim
 }
 
 # elementwise floor division (broadcasting)
-export def "nutorch floor_divide" [t2: string]: string -> string {
-  $in | ^torch floor_divide $t2 | str trim
+# usage: torch floor_divide <t1> <t2>
+export def "nutorch floor_divide" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch floor_divide ...$__rest } else { $__in | ^torch floor_divide ...$__rest }
+  $__out | str trim
 }
 
 # elementwise hypotenuse (broadcasting)
-export def "nutorch hypot" [t2: string]: string -> string {
-  $in | ^torch hypot $t2 | str trim
+# usage: torch hypot <t1> <t2>
+export def "nutorch hypot" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch hypot ...$__rest } else { $__in | ^torch hypot ...$__rest }
+  $__out | str trim
 }
 
 # magnitude of a, sign of b (broadcasting)
-export def "nutorch copysign" [t2: string]: string -> string {
-  $in | ^torch copysign $t2 | str trim
+# usage: torch copysign <t1> <t2>
+export def "nutorch copysign" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch copysign ...$__rest } else { $__in | ^torch copysign ...$__rest }
+  $__out | str trim
 }
 
 # elementwise x*log(y) (broadcasting)
-export def "nutorch xlogy" [t2: string]: string -> string {
-  $in | ^torch xlogy $t2 | str trim
+# usage: torch xlogy <t1> <t2>
+export def "nutorch xlogy" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch xlogy ...$__rest } else { $__in | ^torch xlogy ...$__rest }
+  $__out | str trim
 }
 
 # elementwise log(e^a + e^b) (broadcasting)
-export def "nutorch logaddexp" [t2: string]: string -> string {
-  $in | ^torch logaddexp $t2 | str trim
+# usage: torch logaddexp <t1> <t2>
+export def "nutorch logaddexp" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch logaddexp ...$__rest } else { $__in | ^torch logaddexp ...$__rest }
+  $__out | str trim
 }
 
 # product over all elements, or along --dim
-export def "nutorch prod" [--dim: int, --keepdim]: string -> string {
+# usage: torch prod <t1> [--dim <Int>] [--keepdim]
+export def "nutorch prod" [...rest: any, --dim: int, --keepdim]: any -> string {
   mut args = []
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
   if $keepdim { $args = ($args | append "--keepdim") }
-  $in | ^torch prod ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch prod ...$__rest ...$args } else { $__in | ^torch prod ...$__rest ...$args }
+  $__out | str trim
 }
 
 # max values over all elements, or along --dim
-export def "nutorch amax" [--dim: int, --keepdim]: string -> string {
+# usage: torch amax <t1> [--dim <Int>] [--keepdim]
+export def "nutorch amax" [...rest: any, --dim: int, --keepdim]: any -> string {
   mut args = []
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
   if $keepdim { $args = ($args | append "--keepdim") }
-  $in | ^torch amax ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch amax ...$__rest ...$args } else { $__in | ^torch amax ...$__rest ...$args }
+  $__out | str trim
 }
 
 # min values over all elements, or along --dim
-export def "nutorch amin" [--dim: int, --keepdim]: string -> string {
+# usage: torch amin <t1> [--dim <Int>] [--keepdim]
+export def "nutorch amin" [...rest: any, --dim: int, --keepdim]: any -> string {
   mut args = []
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
   if $keepdim { $args = ($args | append "--keepdim") }
-  $in | ^torch amin ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch amin ...$__rest ...$args } else { $__in | ^torch amin ...$__rest ...$args }
+  $__out | str trim
 }
 
 # max of all elements; with --dim also returns indices
-export def "nutorch max" [--dim: int, --keepdim]: string -> list<string> {
+# usage: torch max <t1> [--dim <Int>] [--keepdim]
+export def "nutorch max" [...rest: any, --dim: int, --keepdim]: any -> list<string> {
   mut args = []
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
   if $keepdim { $args = ($args | append "--keepdim") }
-  $in | ^torch max ...$args | lines
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch max ...$__rest ...$args } else { $__in | ^torch max ...$__rest ...$args }
+  $__out | lines
 }
 
 # min of all elements; with --dim also returns indices
-export def "nutorch min" [--dim: int, --keepdim]: string -> list<string> {
+# usage: torch min <t1> [--dim <Int>] [--keepdim]
+export def "nutorch min" [...rest: any, --dim: int, --keepdim]: any -> list<string> {
   mut args = []
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
   if $keepdim { $args = ($args | append "--keepdim") }
-  $in | ^torch min ...$args | lines
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch min ...$__rest ...$args } else { $__in | ^torch min ...$__rest ...$args }
+  $__out | lines
 }
 
 # median of all elements; with --dim also returns indices
-export def "nutorch median" [--dim: int, --keepdim]: string -> list<string> {
+# usage: torch median <t1> [--dim <Int>] [--keepdim]
+export def "nutorch median" [...rest: any, --dim: int, --keepdim]: any -> list<string> {
   mut args = []
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
   if $keepdim { $args = ($args | append "--keepdim") }
-  $in | ^torch median ...$args | lines
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch median ...$__rest ...$args } else { $__in | ^torch median ...$__rest ...$args }
+  $__out | lines
 }
 
 # index of the max, overall or along --dim
-export def "nutorch argmax" [--dim: int, --keepdim]: string -> string {
+# usage: torch argmax <t1> [--dim <Int>] [--keepdim]
+export def "nutorch argmax" [...rest: any, --dim: int, --keepdim]: any -> string {
   mut args = []
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
   if $keepdim { $args = ($args | append "--keepdim") }
-  $in | ^torch argmax ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch argmax ...$__rest ...$args } else { $__in | ^torch argmax ...$__rest ...$args }
+  $__out | str trim
 }
 
 # index of the min, overall or along --dim
-export def "nutorch argmin" [--dim: int, --keepdim]: string -> string {
+# usage: torch argmin <t1> [--dim <Int>] [--keepdim]
+export def "nutorch argmin" [...rest: any, --dim: int, --keepdim]: any -> string {
   mut args = []
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
   if $keepdim { $args = ($args | append "--keepdim") }
-  $in | ^torch argmin ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch argmin ...$__rest ...$args } else { $__in | ^torch argmin ...$__rest ...$args }
+  $__out | str trim
 }
 
 # true if all elements are true (Bool tensor)
-export def "nutorch all" [--dim: int, --keepdim]: string -> string {
+# usage: torch all <t1> [--dim <Int>] [--keepdim]
+export def "nutorch all" [...rest: any, --dim: int, --keepdim]: any -> string {
   mut args = []
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
   if $keepdim { $args = ($args | append "--keepdim") }
-  $in | ^torch all ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch all ...$__rest ...$args } else { $__in | ^torch all ...$__rest ...$args }
+  $__out | str trim
 }
 
 # true if any element is true (Bool tensor)
-export def "nutorch any" [--dim: int, --keepdim]: string -> string {
+# usage: torch any <t1> [--dim <Int>] [--keepdim]
+export def "nutorch any" [...rest: any, --dim: int, --keepdim]: any -> string {
   mut args = []
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
   if $keepdim { $args = ($args | append "--keepdim") }
-  $in | ^torch any ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch any ...$__rest ...$args } else { $__in | ^torch any ...$__rest ...$args }
+  $__out | str trim
 }
 
 # standard deviation (--correction, default 1)
-export def "nutorch std" [--dim: int, --keepdim, --correction: int]: string -> string {
+# usage: torch std <t1> [--dim <Int>] [--keepdim] [--correction <Int>]
+export def "nutorch std" [...rest: any, --dim: int, --keepdim, --correction: int]: any -> string {
   mut args = []
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
   if $keepdim { $args = ($args | append "--keepdim") }
   if $correction != null { $args = ($args | append ["--correction" ($correction | into string)]) }
-  $in | ^torch std ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch std ...$__rest ...$args } else { $__in | ^torch std ...$__rest ...$args }
+  $__out | str trim
 }
 
 # variance (--correction, default 1)
-export def "nutorch var" [--dim: int, --keepdim, --correction: int]: string -> string {
+# usage: torch var <t1> [--dim <Int>] [--keepdim] [--correction <Int>]
+export def "nutorch var" [...rest: any, --dim: int, --keepdim, --correction: int]: any -> string {
   mut args = []
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
   if $keepdim { $args = ($args | append "--keepdim") }
   if $correction != null { $args = ($args | append ["--correction" ($correction | into string)]) }
-  $in | ^torch var ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch var ...$__rest ...$args } else { $__in | ^torch var ...$__rest ...$args }
+  $__out | str trim
 }
 
 # sum treating NaN as zero
-export def "nutorch nansum" [--dim: int, --keepdim]: string -> string {
+# usage: torch nansum <t1> [--dim <Int>] [--keepdim]
+export def "nutorch nansum" [...rest: any, --dim: int, --keepdim]: any -> string {
   mut args = []
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
   if $keepdim { $args = ($args | append "--keepdim") }
-  $in | ^torch nansum ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch nansum ...$__rest ...$args } else { $__in | ^torch nansum ...$__rest ...$args }
+  $__out | str trim
 }
 
 # log(sum(exp(x))) along --dim
-export def "nutorch logsumexp" [--dim: int, --keepdim]: string -> string {
+# usage: torch logsumexp <t1> [--dim <Int>] [--keepdim]
+export def "nutorch logsumexp" [...rest: any, --dim: int, --keepdim]: any -> string {
   mut args = []
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
   if $keepdim { $args = ($args | append "--keepdim") }
-  $in | ^torch logsumexp ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch logsumexp ...$__rest ...$args } else { $__in | ^torch logsumexp ...$__rest ...$args }
+  $__out | str trim
 }
 
 # count of nonzero elements, overall or along --dim
-export def "nutorch count_nonzero" [--dim: int]: string -> string {
+# usage: torch count_nonzero <t1> [--dim <Int>]
+export def "nutorch count_nonzero" [...rest: any, --dim: int]: any -> string {
   mut args = []
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
-  $in | ^torch count_nonzero ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch count_nonzero ...$__rest ...$args } else { $__in | ^torch count_nonzero ...$__rest ...$args }
+  $__out | str trim
 }
 
 # cumulative sum along --dim
-export def "nutorch cumsum" [--dim: int]: string -> string {
+# usage: torch cumsum <t1> [--dim <Int>]
+export def "nutorch cumsum" [...rest: any, --dim: int]: any -> string {
   mut args = []
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
-  $in | ^torch cumsum ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch cumsum ...$__rest ...$args } else { $__in | ^torch cumsum ...$__rest ...$args }
+  $__out | str trim
 }
 
 # cumulative product along --dim
-export def "nutorch cumprod" [--dim: int]: string -> string {
+# usage: torch cumprod <t1> [--dim <Int>]
+export def "nutorch cumprod" [...rest: any, --dim: int]: any -> string {
   mut args = []
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
-  $in | ^torch cumprod ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch cumprod ...$__rest ...$args } else { $__in | ^torch cumprod ...$__rest ...$args }
+  $__out | str trim
 }
 
 # p-norm (--p default 2), overall or along --dim
-export def "nutorch norm" [--p: number, --dim: int, --keepdim]: string -> string {
+# usage: torch norm <t1> [--p <Float>] [--dim <Int>] [--keepdim]
+export def "nutorch norm" [...rest: any, --p: number, --dim: int, --keepdim]: any -> string {
   mut args = []
   if $p != null { $args = ($args | append ["--p" ($p | into string)]) }
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
   if $keepdim { $args = ($args | append "--keepdim") }
-  $in | ^torch norm ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch norm ...$__rest ...$args } else { $__in | ^torch norm ...$__rest ...$args }
+  $__out | str trim
 }
 
 # elementwise a > b (Bool, broadcasting)
-export def "nutorch gt" [t2: string]: string -> string {
-  $in | ^torch gt $t2 | str trim
+# usage: torch gt <t1> <t2>
+export def "nutorch gt" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch gt ...$__rest } else { $__in | ^torch gt ...$__rest }
+  $__out | str trim
 }
 
 # elementwise a < b (Bool, broadcasting)
-export def "nutorch lt" [t2: string]: string -> string {
-  $in | ^torch lt $t2 | str trim
+# usage: torch lt <t1> <t2>
+export def "nutorch lt" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch lt ...$__rest } else { $__in | ^torch lt ...$__rest }
+  $__out | str trim
 }
 
 # elementwise a >= b (Bool, broadcasting)
-export def "nutorch ge" [t2: string]: string -> string {
-  $in | ^torch ge $t2 | str trim
+# usage: torch ge <t1> <t2>
+export def "nutorch ge" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch ge ...$__rest } else { $__in | ^torch ge ...$__rest }
+  $__out | str trim
 }
 
 # elementwise a <= b (Bool, broadcasting)
-export def "nutorch le" [t2: string]: string -> string {
-  $in | ^torch le $t2 | str trim
+# usage: torch le <t1> <t2>
+export def "nutorch le" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch le ...$__rest } else { $__in | ^torch le ...$__rest }
+  $__out | str trim
 }
 
 # elementwise a != b (Bool, broadcasting)
-export def "nutorch ne" [t2: string]: string -> string {
-  $in | ^torch ne $t2 | str trim
+# usage: torch ne <t1> <t2>
+export def "nutorch ne" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch ne ...$__rest } else { $__in | ^torch ne ...$__rest }
+  $__out | str trim
 }
 
 # elementwise logical AND (Bool, broadcasting)
-export def "nutorch logical_and" [t2: string]: string -> string {
-  $in | ^torch logical_and $t2 | str trim
+# usage: torch logical_and <t1> <t2>
+export def "nutorch logical_and" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch logical_and ...$__rest } else { $__in | ^torch logical_and ...$__rest }
+  $__out | str trim
 }
 
 # elementwise logical OR (Bool, broadcasting)
-export def "nutorch logical_or" [t2: string]: string -> string {
-  $in | ^torch logical_or $t2 | str trim
+# usage: torch logical_or <t1> <t2>
+export def "nutorch logical_or" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch logical_or ...$__rest } else { $__in | ^torch logical_or ...$__rest }
+  $__out | str trim
 }
 
 # elementwise logical XOR (Bool, broadcasting)
-export def "nutorch logical_xor" [t2: string]: string -> string {
-  $in | ^torch logical_xor $t2 | str trim
+# usage: torch logical_xor <t1> <t2>
+export def "nutorch logical_xor" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch logical_xor ...$__rest } else { $__in | ^torch logical_xor ...$__rest }
+  $__out | str trim
 }
 
 # elementwise closeness (Bool; --rtol/--atol)
-export def "nutorch isclose" [t2: string, --rtol: number, --atol: number]: string -> string {
+# usage: torch isclose <t1> <t2> [--rtol <Float>] [--atol <Float>]
+export def "nutorch isclose" [...rest: any, --rtol: number, --atol: number]: any -> string {
   mut args = []
   if $rtol != null { $args = ($args | append ["--rtol" ($rtol | into string)]) }
   if $atol != null { $args = ($args | append ["--atol" ($atol | into string)]) }
-  $in | ^torch isclose $t2 ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch isclose ...$__rest ...$args } else { $__in | ^torch isclose ...$__rest ...$args }
+  $__out | str trim
 }
 
 # elementwise NaN test (Bool)
-export def "nutorch isnan" []: string -> string {
-  $in | ^torch isnan  | str trim
+# usage: torch isnan <t1>
+export def "nutorch isnan" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch isnan ...$__rest } else { $__in | ^torch isnan ...$__rest }
+  $__out | str trim
 }
 
 # elementwise infinity test (Bool)
-export def "nutorch isinf" []: string -> string {
-  $in | ^torch isinf  | str trim
+# usage: torch isinf <t1>
+export def "nutorch isinf" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch isinf ...$__rest } else { $__in | ^torch isinf ...$__rest }
+  $__out | str trim
 }
 
 # elementwise finiteness test (Bool)
-export def "nutorch isfinite" []: string -> string {
-  $in | ^torch isfinite  | str trim
+# usage: torch isfinite <t1>
+export def "nutorch isfinite" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch isfinite ...$__rest } else { $__in | ^torch isfinite ...$__rest }
+  $__out | str trim
 }
 
 # elementwise +inf test (Bool)
-export def "nutorch isposinf" []: string -> string {
-  $in | ^torch isposinf  | str trim
+# usage: torch isposinf <t1>
+export def "nutorch isposinf" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch isposinf ...$__rest } else { $__in | ^torch isposinf ...$__rest }
+  $__out | str trim
 }
 
 # elementwise -inf test (Bool)
-export def "nutorch isneginf" []: string -> string {
-  $in | ^torch isneginf  | str trim
+# usage: torch isneginf <t1>
+export def "nutorch isneginf" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch isneginf ...$__rest } else { $__in | ^torch isneginf ...$__rest }
+  $__out | str trim
 }
 
 # elementwise logical NOT (Bool)
-export def "nutorch logical_not" []: string -> string {
-  $in | ^torch logical_not  | str trim
+# usage: torch logical_not <t1>
+export def "nutorch logical_not" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch logical_not ...$__rest } else { $__in | ^torch logical_not ...$__rest }
+  $__out | str trim
 }
 
 # whole-tensor equality (returns a JSON bool)
-export def "nutorch equal" [t2: string]: string -> any {
-  $in | ^torch equal $t2 | from json | __nutorch-restore
+# usage: torch equal <t1> <t2>
+export def "nutorch equal" [...rest: any]: any -> any {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch equal ...$__rest } else { $__in | ^torch equal ...$__rest }
+  $__out | from json | __nutorch-restore
 }
 
 # top-k values+indices (--smallest = PyTorch largest=False, a nutorch-ism)
-export def "nutorch topk" [k: int, --dim: int, --smallest]: string -> list<string> {
+# usage: torch topk <t1> <k> [--dim <Int>] [--smallest]
+export def "nutorch topk" [...rest: any, --dim: int, --smallest]: any -> list<string> {
   mut args = []
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
   if $smallest { $args = ($args | append "--smallest") }
-  $in | ^torch topk ($k | into string) ...$args | lines
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch topk ...$__rest ...$args } else { $__in | ^torch topk ...$__rest ...$args }
+  $__out | lines
 }
 
 # indices that would sort along --dim (default last)
-export def "nutorch argsort" [--dim: int, --descending]: string -> string {
+# usage: torch argsort <t1> [--dim <Int>] [--descending]
+export def "nutorch argsort" [...rest: any, --dim: int, --descending]: any -> string {
   mut args = []
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
   if $descending { $args = ($args | append "--descending") }
-  $in | ^torch argsort ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch argsort ...$__rest ...$args } else { $__in | ^torch argsort ...$__rest ...$args }
+  $__out | str trim
 }
 
 # general matrix product (batched, PyTorch broadcasting)
-export def "nutorch matmul" [t2: string]: string -> string {
-  $in | ^torch matmul $t2 | str trim
+# usage: torch matmul <t1> <t2>
+export def "nutorch matmul" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch matmul ...$__rest } else { $__in | ^torch matmul ...$__rest }
+  $__out | str trim
 }
 
 # batched matrix multiply of two 3-D tensors
-export def "nutorch bmm" [t2: string]: string -> string {
-  $in | ^torch bmm $t2 | str trim
+# usage: torch bmm <t1> <t2>
+export def "nutorch bmm" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch bmm ...$__rest } else { $__in | ^torch bmm ...$__rest }
+  $__out | str trim
 }
 
 # dot product of two 1-D tensors
-export def "nutorch dot" [t2: string]: string -> string {
-  $in | ^torch dot $t2 | str trim
+# usage: torch dot <t1> <t2>
+export def "nutorch dot" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch dot ...$__rest } else { $__in | ^torch dot ...$__rest }
+  $__out | str trim
 }
 
 # outer product of two 1-D tensors
-export def "nutorch outer" [t2: string]: string -> string {
-  $in | ^torch outer $t2 | str trim
+# usage: torch outer <t1> <t2>
+export def "nutorch outer" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch outer ...$__rest } else { $__in | ^torch outer ...$__rest }
+  $__out | str trim
 }
 
 # Einstein summation over --equation
@@ -777,89 +1213,149 @@ export def "nutorch einsum" [...rest: string, --equation: string]: any -> string
 }
 
 # lower triangle (--diagonal offset)
-export def "nutorch tril" [--diagonal: int]: string -> string {
+# usage: torch tril <t1> [--diagonal <Int>]
+export def "nutorch tril" [...rest: any, --diagonal: int]: any -> string {
   mut args = []
   if $diagonal != null { $args = ($args | append ["--diagonal" ($diagonal | into string)]) }
-  $in | ^torch tril ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch tril ...$__rest ...$args } else { $__in | ^torch tril ...$__rest ...$args }
+  $__out | str trim
 }
 
 # upper triangle (--diagonal offset)
-export def "nutorch triu" [--diagonal: int]: string -> string {
+# usage: torch triu <t1> [--diagonal <Int>]
+export def "nutorch triu" [...rest: any, --diagonal: int]: any -> string {
   mut args = []
   if $diagonal != null { $args = ($args | append ["--diagonal" ($diagonal | into string)]) }
-  $in | ^torch triu ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch triu ...$__rest ...$args } else { $__in | ^torch triu ...$__rest ...$args }
+  $__out | str trim
 }
 
 # diagonal of a matrix, or diagonal matrix from a vector
-export def "nutorch diag" [--diagonal: int]: string -> string {
+# usage: torch diag <t1> [--diagonal <Int>]
+export def "nutorch diag" [...rest: any, --diagonal: int]: any -> string {
   mut args = []
   if $diagonal != null { $args = ($args | append ["--diagonal" ($diagonal | into string)]) }
-  $in | ^torch diag ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch diag ...$__rest ...$args } else { $__in | ^torch diag ...$__rest ...$args }
+  $__out | str trim
 }
 
 # sum of the main diagonal of a 2-D tensor
-export def "nutorch trace" []: string -> string {
-  $in | ^torch trace  | str trim
+# usage: torch trace <t1>
+export def "nutorch trace" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch trace ...$__rest } else { $__in | ^torch trace ...$__rest }
+  $__out | str trim
 }
 
 # determinant of a square matrix
-export def "nutorch det" []: string -> string {
-  $in | ^torch det  | str trim
+# usage: torch det <t1>
+export def "nutorch det" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch det ...$__rest } else { $__in | ^torch det ...$__rest }
+  $__out | str trim
 }
 
 # inverse of a square matrix
-export def "nutorch inverse" []: string -> string {
-  $in | ^torch inverse  | str trim
+# usage: torch inverse <t1>
+export def "nutorch inverse" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch inverse ...$__rest } else { $__in | ^torch inverse ...$__rest }
+  $__out | str trim
 }
 
 # singular value decomposition (U, S, V)
-export def "nutorch svd" []: string -> list<string> {
-  $in | ^torch svd  | lines
+# usage: torch svd <t1>
+export def "nutorch svd" [...rest: any]: any -> list<string> {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch svd ...$__rest } else { $__in | ^torch svd ...$__rest }
+  $__out | lines
 }
 
 # solve AX = B for X
-export def "nutorch solve" [t2: string]: string -> string {
-  $in | ^torch solve $t2 | str trim
+# usage: torch solve <t1> <t2>
+export def "nutorch solve" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch solve ...$__rest } else { $__in | ^torch solve ...$__rest }
+  $__out | str trim
 }
 
 # reshape to the given shape (-1 infers one dim)
-export def "nutorch reshape" [shape: list<int>]: string -> string {
-  $in | ^torch reshape ($shape | to json -r) | str trim
+# usage: torch reshape <t1> <shape>
+export def "nutorch reshape" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch reshape ...$__rest } else { $__in | ^torch reshape ...$__rest }
+  $__out | str trim
 }
 
 # permute dimensions
-export def "nutorch permute" [dims: list<int>]: string -> string {
-  $in | ^torch permute ($dims | to json -r) | str trim
+# usage: torch permute <t1> <dims>
+export def "nutorch permute" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch permute ...$__rest } else { $__in | ^torch permute ...$__rest }
+  $__out | str trim
 }
 
 # swap two dimensions
-export def "nutorch transpose" [dim0: int, dim1: int]: string -> string {
-  $in | ^torch transpose ($dim0 | into string) ($dim1 | into string) | str trim
+# usage: torch transpose <t1> <dim0> <dim1>
+export def "nutorch transpose" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch transpose ...$__rest } else { $__in | ^torch transpose ...$__rest }
+  $__out | str trim
 }
 
 # transpose a 2-D tensor
-export def "nutorch t" []: string -> string {
-  $in | ^torch t  | str trim
+# usage: torch t <t1>
+export def "nutorch t" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch t ...$__rest } else { $__in | ^torch t ...$__rest }
+  $__out | str trim
 }
 
 # drop size-1 dims (all, or --dim)
-export def "nutorch squeeze" [--dim: int]: string -> string {
+# usage: torch squeeze <t1> [--dim <Int>]
+export def "nutorch squeeze" [...rest: any, --dim: int]: any -> string {
   mut args = []
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
-  $in | ^torch squeeze ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch squeeze ...$__rest ...$args } else { $__in | ^torch squeeze ...$__rest ...$args }
+  $__out | str trim
 }
 
 # insert a size-1 dim
-export def "nutorch unsqueeze" [dim: int]: string -> string {
-  $in | ^torch unsqueeze ($dim | into string) | str trim
+# usage: torch unsqueeze <t1> <dim>
+export def "nutorch unsqueeze" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch unsqueeze ...$__rest } else { $__in | ^torch unsqueeze ...$__rest }
+  $__out | str trim
 }
 
 # flatten dims (--start_dim/--end_dim)
-export def "nutorch flatten" [--start_dim: int, --end_dim: int]: string -> string {
+# usage: torch flatten <t1> [--start_dim <Int>] [--end_dim <Int>]
+export def "nutorch flatten" [...rest: any, --start_dim: int, --end_dim: int]: any -> string {
   mut args = []
   if $start_dim != null { $args = ($args | append ["--start_dim" ($start_dim | into string)]) }
   if $end_dim != null { $args = ($args | append ["--end_dim" ($end_dim | into string)]) }
-  $in | ^torch flatten ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch flatten ...$__rest ...$args } else { $__in | ^torch flatten ...$__rest ...$args }
+  $__out | str trim
 }
 
 # stack tensors along a NEW --dim (default 0)
@@ -872,75 +1368,123 @@ export def "nutorch stack" [...rest: string, --dim: int]: any -> string {
 }
 
 # split into chunks of split_size along --dim
-export def "nutorch split" [split_size: int, --dim: int]: string -> list<string> {
+# usage: torch split <t1> <split_size> [--dim <Int>]
+export def "nutorch split" [...rest: any, --dim: int]: any -> list<string> {
   mut args = []
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
-  $in | ^torch split ($split_size | into string) ...$args | lines
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch split ...$__rest ...$args } else { $__in | ^torch split ...$__rest ...$args }
+  $__out | lines
 }
 
 # split into N chunks along --dim
-export def "nutorch chunk" [chunks: int, --dim: int]: string -> list<string> {
+# usage: torch chunk <t1> <chunks> [--dim <Int>]
+export def "nutorch chunk" [...rest: any, --dim: int]: any -> list<string> {
   mut args = []
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
-  $in | ^torch chunk ($chunks | into string) ...$args | lines
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch chunk ...$__rest ...$args } else { $__in | ^torch chunk ...$__rest ...$args }
+  $__out | lines
 }
 
 # gather values along --dim using an int64 index tensor
-export def "nutorch gather" [t2: string, --dim: int]: string -> string {
+# usage: torch gather <t1> <t2> [--dim <Int>]
+export def "nutorch gather" [...rest: any, --dim: int]: any -> string {
   mut args = []
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
-  $in | ^torch gather $t2 ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch gather ...$__rest ...$args } else { $__in | ^torch gather ...$__rest ...$args }
+  $__out | str trim
 }
 
 # select rows/cols along --dim by an int64 index tensor
-export def "nutorch index_select" [t2: string, --dim: int]: string -> string {
+# usage: torch index_select <t1> <t2> [--dim <Int>]
+export def "nutorch index_select" [...rest: any, --dim: int]: any -> string {
   mut args = []
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
-  $in | ^torch index_select $t2 ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch index_select ...$__rest ...$args } else { $__in | ^torch index_select ...$__rest ...$args }
+  $__out | str trim
 }
 
 # select by mask (numeric mask cast via != 0, a nutorch-ism)
-export def "nutorch masked_select" [t2: string]: string -> string {
-  $in | ^torch masked_select $t2 | str trim
+# usage: torch masked_select <t1> <t2>
+export def "nutorch masked_select" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch masked_select ...$__rest } else { $__in | ^torch masked_select ...$__rest }
+  $__out | str trim
 }
 
 # cond ? x : y (numeric cond cast via != 0, a nutorch-ism)
-export def "nutorch where" [t2: string, t3: string]: string -> string {
-  $in | ^torch where $t2 $t3 | str trim
+# usage: torch where <t1> <t2> <t3>
+export def "nutorch where" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch where ...$__rest } else { $__in | ^torch where ...$__rest }
+  $__out | str trim
 }
 
 # slice: length elements from start along dim
-export def "nutorch narrow" [dim: int, start: int, length: int]: string -> string {
-  $in | ^torch narrow ($dim | into string) ($start | into string) ($length | into string) | str trim
+# usage: torch narrow <t1> <dim> <start> <length>
+export def "nutorch narrow" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch narrow ...$__rest } else { $__in | ^torch narrow ...$__rest }
+  $__out | str trim
 }
 
 # reverse along the given dims
-export def "nutorch flip" [dims: list<int>]: string -> string {
-  $in | ^torch flip ($dims | to json -r) | str trim
+# usage: torch flip <t1> <dims>
+export def "nutorch flip" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch flip ...$__rest } else { $__in | ^torch flip ...$__rest }
+  $__out | str trim
 }
 
 # roll elements by shifts (optionally along --dims)
-export def "nutorch roll" [shifts: list<int>, --dims: list<int>]: string -> string {
+# usage: torch roll <t1> <shifts> [--dims <IntList>]
+export def "nutorch roll" [...rest: any, --dims: list<int>]: any -> string {
   mut args = []
   if $dims != null { $args = ($args | append ["--dims" ($dims | to json -r)]) }
-  $in | ^torch roll ($shifts | to json -r) ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch roll ...$__rest ...$args } else { $__in | ^torch roll ...$__rest ...$args }
+  $__out | str trim
 }
 
 # tile the tensor by repeats per dim
-export def "nutorch repeat" [repeats: list<int>]: string -> string {
-  $in | ^torch repeat ($repeats | to json -r) | str trim
+# usage: torch repeat <t1> <repeats>
+export def "nutorch repeat" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch repeat ...$__rest } else { $__in | ^torch repeat ...$__rest }
+  $__out | str trim
 }
 
 # repeat each element N times (optionally along --dim)
-export def "nutorch repeat_interleave" [repeats: int, --dim: int]: string -> string {
+# usage: torch repeat_interleave <t1> <repeats> [--dim <Int>]
+export def "nutorch repeat_interleave" [...rest: any, --dim: int]: any -> string {
   mut args = []
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
-  $in | ^torch repeat_interleave ($repeats | into string) ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch repeat_interleave ...$__rest ...$args } else { $__in | ^torch repeat_interleave ...$__rest ...$args }
+  $__out | str trim
 }
 
 # move a dim to a new position
-export def "nutorch movedim" [source: int, destination: int]: string -> string {
-  $in | ^torch movedim ($source | into string) ($destination | into string) | str trim
+# usage: torch movedim <t1> <source> <destination>
+export def "nutorch movedim" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch movedim ...$__rest } else { $__in | ^torch movedim ...$__rest }
+  $__out | str trim
 }
 
 # a tensor of zeros
@@ -994,223 +1538,371 @@ export def "nutorch randint" [high: int, shape: list<int>, --low: int]: nothing 
 }
 
 # zeros with the input's shape and dtype
-export def "nutorch zeros_like" []: string -> string {
-  $in | ^torch zeros_like  | str trim
+# usage: torch zeros_like <t1>
+export def "nutorch zeros_like" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch zeros_like ...$__rest } else { $__in | ^torch zeros_like ...$__rest }
+  $__out | str trim
 }
 
 # ones with the input's shape and dtype
-export def "nutorch ones_like" []: string -> string {
-  $in | ^torch ones_like  | str trim
+# usage: torch ones_like <t1>
+export def "nutorch ones_like" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch ones_like ...$__rest } else { $__in | ^torch ones_like ...$__rest }
+  $__out | str trim
 }
 
 # a value-filled tensor with the input's shape and dtype
-export def "nutorch full_like" [value: number]: string -> string {
-  $in | ^torch full_like ($value | into string) | str trim
+# usage: torch full_like <t1> <value>
+export def "nutorch full_like" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch full_like ...$__rest } else { $__in | ^torch full_like ...$__rest }
+  $__out | str trim
 }
 
 # uniform random with the input's shape (seeded CPU generator)
-export def "nutorch rand_like" []: string -> string {
-  $in | ^torch rand_like  | str trim
+# usage: torch rand_like <t1>
+export def "nutorch rand_like" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch rand_like ...$__rest } else { $__in | ^torch rand_like ...$__rest }
+  $__out | str trim
 }
 
 # normal random with the input's shape (seeded CPU generator)
-export def "nutorch randn_like" []: string -> string {
-  $in | ^torch randn_like  | str trim
+# usage: torch randn_like <t1>
+export def "nutorch randn_like" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch randn_like ...$__rest } else { $__in | ^torch randn_like ...$__rest }
+  $__out | str trim
 }
 
 # a + weight*(b - a) (scalar or tensor weight)
-export def "nutorch lerp" [t2: string, weight: any]: string -> string {
-  $in | ^torch lerp $t2 ($weight | into string) | str trim
+# usage: torch lerp <t1> <t2> <weight>
+export def "nutorch lerp" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch lerp ...$__rest } else { $__in | ^torch lerp ...$__rest }
+  $__out | str trim
 }
 
 # a + value * b * c
-export def "nutorch addcmul" [t2: string, t3: string, --value: number]: string -> string {
+# usage: torch addcmul <t1> <t2> <t3> [--value <Scalar>]
+export def "nutorch addcmul" [...rest: any, --value: number]: any -> string {
   mut args = []
   if $value != null { $args = ($args | append ["--value" ($value | into string)]) }
-  $in | ^torch addcmul $t2 $t3 ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch addcmul ...$__rest ...$args } else { $__in | ^torch addcmul ...$__rest ...$args }
+  $__out | str trim
 }
 
 # a + value * b / c
-export def "nutorch addcdiv" [t2: string, t3: string, --value: number]: string -> string {
+# usage: torch addcdiv <t1> <t2> <t3> [--value <Scalar>]
+export def "nutorch addcdiv" [...rest: any, --value: number]: any -> string {
   mut args = []
   if $value != null { $args = ($args | append ["--value" ($value | into string)]) }
-  $in | ^torch addcdiv $t2 $t3 ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch addcdiv ...$__rest ...$args } else { $__in | ^torch addcdiv ...$__rest ...$args }
+  $__out | str trim
 }
 
 # vector cross product along --dim
-export def "nutorch cross" [t2: string, --dim: int]: string -> string {
+# usage: torch cross <t1> <t2> [--dim <Int>]
+export def "nutorch cross" [...rest: any, --dim: int]: any -> string {
   mut args = []
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
-  $in | ^torch cross $t2 ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch cross ...$__rest ...$args } else { $__in | ^torch cross ...$__rest ...$args }
+  $__out | str trim
 }
 
 # Kronecker product
-export def "nutorch kron" [t2: string]: string -> string {
-  $in | ^torch kron $t2 | str trim
+# usage: torch kron <t1> <t2>
+export def "nutorch kron" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch kron ...$__rest } else { $__in | ^torch kron ...$__rest }
+  $__out | str trim
 }
 
 # tensor contraction over the last/first --dims dims (default 2)
-export def "nutorch tensordot" [t2: string, --dims: int]: string -> string {
+# usage: torch tensordot <t1> <t2> [--dims <Int>]
+export def "nutorch tensordot" [...rest: any, --dims: int]: any -> string {
   mut args = []
   if $dims != null { $args = ($args | append ["--dims" ($dims | into string)]) }
-  $in | ^torch tensordot $t2 ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch tensordot ...$__rest ...$args } else { $__in | ^torch tensordot ...$__rest ...$args }
+  $__out | str trim
 }
 
 # gather along --dim with a broadcastable int64 index
-export def "nutorch take_along_dim" [t2: string, --dim: int]: string -> string {
+# usage: torch take_along_dim <t1> <t2> [--dim <Int>]
+export def "nutorch take_along_dim" [...rest: any, --dim: int]: any -> string {
   mut args = []
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
-  $in | ^torch take_along_dim $t2 ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch take_along_dim ...$__rest ...$args } else { $__in | ^torch take_along_dim ...$__rest ...$args }
+  $__out | str trim
 }
 
 # insertion indices: searchsorted(sorted_seq, values)
-export def "nutorch searchsorted" [t2: string]: string -> string {
-  $in | ^torch searchsorted $t2 | str trim
+# usage: torch searchsorted <t1> <t2>
+export def "nutorch searchsorted" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch searchsorted ...$__rest } else { $__in | ^torch searchsorted ...$__rest }
+  $__out | str trim
 }
 
 # bucket indices: bucketize(values, boundaries)
-export def "nutorch bucketize" [t2: string]: string -> string {
-  $in | ^torch bucketize $t2 | str trim
+# usage: torch bucketize <t1> <t2>
+export def "nutorch bucketize" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch bucketize ...$__rest } else { $__in | ^torch bucketize ...$__rest }
+  $__out | str trim
 }
 
 # sort along the first dimension (values only)
-export def "nutorch msort" []: string -> string {
-  $in | ^torch msort  | str trim
+# usage: torch msort <t1>
+export def "nutorch msort" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch msort ...$__rest } else { $__in | ^torch msort ...$__rest }
+  $__out | str trim
 }
 
 # forward differences along --dim (default last)
-export def "nutorch diff" [--dim: int]: string -> string {
+# usage: torch diff <t1> [--dim <Int>]
+export def "nutorch diff" [...rest: any, --dim: int]: any -> string {
   mut args = []
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
-  $in | ^torch diff ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch diff ...$__rest ...$args } else { $__in | ^torch diff ...$__rest ...$args }
+  $__out | str trim
 }
 
 # non-inplace scatter: input, int64 index, src along --dim
-export def "nutorch scatter" [t2: string, t3: string, --dim: int]: string -> string {
+# usage: torch scatter <t1> <t2> <t3> [--dim <Int>]
+export def "nutorch scatter" [...rest: any, --dim: int]: any -> string {
   mut args = []
   if $dim != null { $args = ($args | append ["--dim" ($dim | into string)]) }
-  $in | ^torch scatter $t2 $t3 ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch scatter ...$__rest ...$args } else { $__in | ^torch scatter ...$__rest ...$args }
+  $__out | str trim
 }
 
 # bitwise AND of int tensors (broadcasting)
-export def "nutorch bitwise_and" [t2: string]: string -> string {
-  $in | ^torch bitwise_and $t2 | str trim
+# usage: torch bitwise_and <t1> <t2>
+export def "nutorch bitwise_and" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch bitwise_and ...$__rest } else { $__in | ^torch bitwise_and ...$__rest }
+  $__out | str trim
 }
 
 # bitwise OR of int tensors (broadcasting)
-export def "nutorch bitwise_or" [t2: string]: string -> string {
-  $in | ^torch bitwise_or $t2 | str trim
+# usage: torch bitwise_or <t1> <t2>
+export def "nutorch bitwise_or" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch bitwise_or ...$__rest } else { $__in | ^torch bitwise_or ...$__rest }
+  $__out | str trim
 }
 
 # bitwise XOR of int tensors (broadcasting)
-export def "nutorch bitwise_xor" [t2: string]: string -> string {
-  $in | ^torch bitwise_xor $t2 | str trim
+# usage: torch bitwise_xor <t1> <t2>
+export def "nutorch bitwise_xor" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch bitwise_xor ...$__rest } else { $__in | ^torch bitwise_xor ...$__rest }
+  $__out | str trim
 }
 
 # bitwise NOT of an int tensor
-export def "nutorch bitwise_not" []: string -> string {
-  $in | ^torch bitwise_not  | str trim
+# usage: torch bitwise_not <t1>
+export def "nutorch bitwise_not" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch bitwise_not ...$__rest } else { $__in | ^torch bitwise_not ...$__rest }
+  $__out | str trim
 }
 
 # left shift of int tensors (broadcasting)
-export def "nutorch bitwise_left_shift" [t2: string]: string -> string {
-  $in | ^torch bitwise_left_shift $t2 | str trim
+# usage: torch bitwise_left_shift <t1> <t2>
+export def "nutorch bitwise_left_shift" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch bitwise_left_shift ...$__rest } else { $__in | ^torch bitwise_left_shift ...$__rest }
+  $__out | str trim
 }
 
 # right shift of int tensors (broadcasting)
-export def "nutorch bitwise_right_shift" [t2: string]: string -> string {
-  $in | ^torch bitwise_right_shift $t2 | str trim
+# usage: torch bitwise_right_shift <t1> <t2>
+export def "nutorch bitwise_right_shift" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch bitwise_right_shift ...$__rest } else { $__in | ^torch bitwise_right_shift ...$__rest }
+  $__out | str trim
 }
 
 # sorted unique values
-export def "nutorch unique" []: string -> string {
-  $in | ^torch unique  | str trim
+# usage: torch unique <t1>
+export def "nutorch unique" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch unique ...$__rest } else { $__in | ^torch unique ...$__rest }
+  $__out | str trim
 }
 
 # backpropagate from a scalar loss (gradients accumulate)
-export def "nutorch backward" []: string -> nothing {
-  $in | ^torch backward  | ignore
+# usage: torch backward <t1>
+export def "nutorch backward" [...rest: any]: any -> nothing {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch backward ...$__rest } else { $__in | ^torch backward ...$__rest }
+  $__out | ignore
 }
 
 # snapshot of a tensor's accumulated gradient
-export def "nutorch grad" []: string -> string {
-  $in | ^torch grad  | str trim
+# usage: torch grad <t1>
+export def "nutorch grad" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch grad ...$__rest } else { $__in | ^torch grad ...$__rest }
+  $__out | str trim
 }
 
 # a graph-free reference to the same data
-export def "nutorch detach" []: string -> string {
-  $in | ^torch detach  | str trim
+# usage: torch detach <t1>
+export def "nutorch detach" [...rest: any]: any -> string {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch detach ...$__rest } else { $__in | ^torch detach ...$__rest }
+  $__out | str trim
 }
 
 # zero a tensor's accumulated gradient in place
-export def "nutorch zero_grad" []: string -> nothing {
-  $in | ^torch zero_grad  | ignore
+# usage: torch zero_grad <t1>
+export def "nutorch zero_grad" [...rest: any]: any -> nothing {
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch zero_grad ...$__rest } else { $__in | ^torch zero_grad ...$__rest }
+  $__out | ignore
 }
 
 # mean squared error (--reduction mean|sum|none)
-export def "nutorch mse_loss" [t2: string, --reduction: string]: string -> string {
+# usage: torch mse_loss <t1> <t2> [--reduction <Str>]
+export def "nutorch mse_loss" [...rest: any, --reduction: string]: any -> string {
   mut args = []
   if $reduction != null { $args = ($args | append ["--reduction" ($reduction | into string)]) }
-  $in | ^torch mse_loss $t2 ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch mse_loss ...$__rest ...$args } else { $__in | ^torch mse_loss ...$__rest ...$args }
+  $__out | str trim
 }
 
 # mean absolute error (--reduction)
-export def "nutorch l1_loss" [t2: string, --reduction: string]: string -> string {
+# usage: torch l1_loss <t1> <t2> [--reduction <Str>]
+export def "nutorch l1_loss" [...rest: any, --reduction: string]: any -> string {
   mut args = []
   if $reduction != null { $args = ($args | append ["--reduction" ($reduction | into string)]) }
-  $in | ^torch l1_loss $t2 ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch l1_loss ...$__rest ...$args } else { $__in | ^torch l1_loss ...$__rest ...$args }
+  $__out | str trim
 }
 
 # smooth L1 loss (--beta, default 1.0)
-export def "nutorch smooth_l1_loss" [t2: string, --reduction: string, --beta: number]: string -> string {
+# usage: torch smooth_l1_loss <t1> <t2> [--reduction <Str>] [--beta <Float>]
+export def "nutorch smooth_l1_loss" [...rest: any, --reduction: string, --beta: number]: any -> string {
   mut args = []
   if $reduction != null { $args = ($args | append ["--reduction" ($reduction | into string)]) }
   if $beta != null { $args = ($args | append ["--beta" ($beta | into string)]) }
-  $in | ^torch smooth_l1_loss $t2 ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch smooth_l1_loss ...$__rest ...$args } else { $__in | ^torch smooth_l1_loss ...$__rest ...$args }
+  $__out | str trim
 }
 
 # Huber loss (--delta, default 1.0)
-export def "nutorch huber_loss" [t2: string, --reduction: string, --delta: number]: string -> string {
+# usage: torch huber_loss <t1> <t2> [--reduction <Str>] [--delta <Float>]
+export def "nutorch huber_loss" [...rest: any, --reduction: string, --delta: number]: any -> string {
   mut args = []
   if $reduction != null { $args = ($args | append ["--reduction" ($reduction | into string)]) }
   if $delta != null { $args = ($args | append ["--delta" ($delta | into string)]) }
-  $in | ^torch huber_loss $t2 ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch huber_loss ...$__rest ...$args } else { $__in | ^torch huber_loss ...$__rest ...$args }
+  $__out | str trim
 }
 
 # cross entropy over logits vs int64 class indices
-export def "nutorch cross_entropy" [t2: string, --reduction: string]: string -> string {
+# usage: torch cross_entropy <t1> <t2> [--reduction <Str>]
+export def "nutorch cross_entropy" [...rest: any, --reduction: string]: any -> string {
   mut args = []
   if $reduction != null { $args = ($args | append ["--reduction" ($reduction | into string)]) }
-  $in | ^torch cross_entropy $t2 ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch cross_entropy ...$__rest ...$args } else { $__in | ^torch cross_entropy ...$__rest ...$args }
+  $__out | str trim
 }
 
 # negative log likelihood (log-prob inputs, int64 targets)
-export def "nutorch nll_loss" [t2: string, --reduction: string]: string -> string {
+# usage: torch nll_loss <t1> <t2> [--reduction <Str>]
+export def "nutorch nll_loss" [...rest: any, --reduction: string]: any -> string {
   mut args = []
   if $reduction != null { $args = ($args | append ["--reduction" ($reduction | into string)]) }
-  $in | ^torch nll_loss $t2 ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch nll_loss ...$__rest ...$args } else { $__in | ^torch nll_loss ...$__rest ...$args }
+  $__out | str trim
 }
 
 # BCE over probabilities in [0,1]
-export def "nutorch binary_cross_entropy" [t2: string, --reduction: string]: string -> string {
+# usage: torch binary_cross_entropy <t1> <t2> [--reduction <Str>]
+export def "nutorch binary_cross_entropy" [...rest: any, --reduction: string]: any -> string {
   mut args = []
   if $reduction != null { $args = ($args | append ["--reduction" ($reduction | into string)]) }
-  $in | ^torch binary_cross_entropy $t2 ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch binary_cross_entropy ...$__rest ...$args } else { $__in | ^torch binary_cross_entropy ...$__rest ...$args }
+  $__out | str trim
 }
 
 # BCE over logits (the stable form)
-export def "nutorch binary_cross_entropy_with_logits" [t2: string, --reduction: string]: string -> string {
+# usage: torch binary_cross_entropy_with_logits <t1> <t2> [--reduction <Str>]
+export def "nutorch binary_cross_entropy_with_logits" [...rest: any, --reduction: string]: any -> string {
   mut args = []
   if $reduction != null { $args = ($args | append ["--reduction" ($reduction | into string)]) }
-  $in | ^torch binary_cross_entropy_with_logits $t2 ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch binary_cross_entropy_with_logits ...$__rest ...$args } else { $__in | ^torch binary_cross_entropy_with_logits ...$__rest ...$args }
+  $__out | str trim
 }
 
 # KL divergence (--log_target if target is log-space)
-export def "nutorch kl_div" [t2: string, --reduction: string, --log_target]: string -> string {
+# usage: torch kl_div <t1> <t2> [--reduction <Str>] [--log_target]
+export def "nutorch kl_div" [...rest: any, --reduction: string, --log_target]: any -> string {
   mut args = []
   if $reduction != null { $args = ($args | append ["--reduction" ($reduction | into string)]) }
   if $log_target { $args = ($args | append "--log_target") }
-  $in | ^torch kl_div $t2 ...$args | str trim
+  let __rest = ($rest | each {|a| if ($a | describe | str starts-with "list") { $a | to json -r } else { $a | into string } })
+  let __in = $in
+  let __out = if $__in == null { ^torch kl_div ...$__rest ...$args } else { $__in | ^torch kl_div ...$__rest ...$args }
+  $__out | str trim
 }
 
 # seed the random number generator

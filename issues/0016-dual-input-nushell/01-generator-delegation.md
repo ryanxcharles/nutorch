@@ -134,3 +134,63 @@ source by line number; the reviewer confirmed the silent-ignore path
 the `usage()` string availability for the generated comments, and that the
 harness sample covers the list-conversion, typed-flag, and untouched-`AtLeast`
 paths.
+
+## Result
+
+**Result:** Pass
+
+One grammar now serves both shells — 173 wrappers regenerated, every parity
+check green.
+
+- **The generator change landed as designed**: `Exactly(n ≥ 1)` ops emit
+  `[...rest: any, --flags…]: any -> <result>` with the generic conversion (lists
+  → `to json -r`, else `into string`), a `$in`-null branch, and the op's CLI
+  `usage:` line in the generated comment. `AtLeast` and `Exactly(0)` arms
+  byte-untouched — the module diff confirms NONE of cat/stack/creation/registry
+  wrappers changed; exactly 173 wrappers did (172 delegated table ops + the
+  prelude's `forward`, now dual via the same shape).
+- **The parity harness (`scripts/test-dual-input.nu`, committed) is 11/11**: add
+  (+ `--alpha`), mm, mse_loss, zero_grad (parity via the post-call grad read),
+  gather (`--dim`), reshape (the IntList path), cat (both variadic forms,
+  untouched arm), forward — pipeline and argument forms identical in every case;
+  both CLI arity errors surface through the module.
+- **One nuance discovered and recorded in the harness**: the CLI's under-supply
+  message is context-dependent — at a terminal it says "missing tensor
+  operand(s)…", but with non-TTY stdin it reads EOF and says "expected N piped
+  handle(s), got 0". Both are the grammar's own errors; the harness accepts
+  either. Also: a def-internal external failure raises past an in-process
+  `do | complete`, so the error assertions capture via a sub-`nu` invocation.
+- **Hygiene**: `cargo fmt --check` clean; build 0 warnings; full Rust suite
+  green INCLUDING the regenerated-module staleness test; `train-regression.nu`
+  passes (weight 1.9996, bias 1.0008); `check:content` and `check:tabs` green
+  (the issue-0015 twins' pipeline forms remain valid); a 0015 twin spot-run
+  returns `[5.0, 7.0, 9.0]`.
+- **The keg/autoload module is unchanged until the next release**, as always —
+  verification used the repo module via explicit `use`.
+
+## Conclusion
+
+The Dual Input Pattern is now one implementation serving two shells: the wrapper
+forwards, the CLI decides. `nutorch add $a $b` and `$a | nutorch add $b` are
+equals, `forward` included. Experiment 2 straightens the documentation — the
+dual-input sections get their argument form back in the nu panels and the
+"pipeline-first by design" prose retires.
+
+## Result Review
+
+**Reviewer:** `adversarial-reviewer` subagent (fresh context), reviewing BEFORE
+the result commit. **First pass: CHANGES REQUIRED on one record-accuracy
+defect** — the Result claimed 162 regenerated wrappers; the authoritative count
+(greps over the staleness-verified committed module) is 173 (172 delegated table
+wrappers + `forward`). Corrected in both documents before the commit. Everything
+substantive was verified and reproduced independently: hygiene (fmt, 0-warning
+build, full suite incl. the staleness test, whose include_str comparison the
+reviewer confirmed); the diff scope (only delegated wrappers + forward changed;
+cat/stack, creation, registry, and other prelude verbs untouched; spot-read
+add/zero_grad/reshape correct); the 11/11 parity harness; the reviewer's OWN
+probes (sub, squeeze --dim, argmax --dim both forms; the silent-ignore contract
+demonstrated numerically — `$a | nutorch add $b $c` computes add(b,c); a
+Value-result op both forms); train-regression.nu; the website gates; and the
+process state (plan commit 6e3615a plan-only at HEAD, result uncommitted, `v1/`
+untouched). The narrative's nuances (the context-dependent under-supply message;
+the `do | complete` capture escape) were judged accurate.
