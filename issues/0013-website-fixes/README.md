@@ -42,6 +42,8 @@ fixes and reserved "other things I may want to fix."
   **Pass** (the add pipeline leads the page above the fold in both modes; the
   spec-sheet paragraph gone, meta description included; the honesty gate now
   scans the landing page's template literals)
+- [Experiment 4: The three-state theme — system / light / dark](04-three-state-theme.md)
+  — **Designed**
 
 ## Background
 
