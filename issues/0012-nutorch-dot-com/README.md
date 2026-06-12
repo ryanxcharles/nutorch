@@ -1,6 +1,7 @@
 +++
-status = "open"
+status = "closed"
 opened = "2026-06-11"
+closed = "2026-06-11"
 +++
 
 # Issue 12: nutorch.com — a beautiful documentation website
@@ -160,6 +161,46 @@ nutorch/website/              ← lives in THIS repo (like termsurf)
 - [Experiment 4: Search, sitemap, and the finishing pass](04-search-and-polish.md)
   — **Pass** (Pagefind search proven by CDP-driven interaction in both modes;
   sitemap with the /docs duplicate filtered; link gate bites; on-brand 404)
+
+## Conclusion
+
+**The goal is met.** nutorch.com exists as a complete, beautiful, local-only
+static site under `website/`: run `bun run build && bun run preview` and the
+whole thing serves from `dist/` — 20 routes, both modes, zero runtime external
+requests.
+
+What the four experiments built, in order:
+
+1. **The skeleton and the brand** (Exp 1): Astro 6 static + Bun + Tailwind v4;
+   brand tokens MEASURED from the logo (shell green `#5cc962`, flame `#f06820`)
+   with per-mode ramps; dark/light via a no-flash `data-theme` script + header
+   toggle; Shiki dual Vitesse themes with the `!important` glue (two review
+   catches: `<Code>` ignores `markdown.shikiConfig`, and inline styles demand
+   `!important`); the logo pipeline (favicon, marks, hero, OG card); the landing
+   page.
+2. **The docs** (Exp 2): typed content collections, the collection-driven
+   sidebar (sections + order from frontmatter), prose styling, prev/next, and 8
+   written pages drafted from the README and verified against the real binaries
+   — the honesty checker caught a fictional verb (`nn step`); the screenshot
+   gate caught the closed-`<details>` sidebar bug; the result reviewer caught a
+   wrong `arange` form.
+3. **The ops reference** (Exp 3): 9 category pages GENERATED from
+   `torch ops --json` + live `usage:` lines — 185 ops, byte-stable, with a
+   staleness gate (`check:ops-ref`) and the dprint fixed-point rule (formatter
+   disagreement = generator bug).
+4. **Search and polish** (Exp 4): Pagefind (17 docs pages indexed, proven by
+   CDP-driven interaction in both modes), sitemap with the `/docs/` alias
+   filtered, robots.txt, OG url/type/site_name, an on-brand 404 ("unknown
+   handle: 404://"), and the `check:links` gate.
+
+All four issue design questions settled (look from the logo with a toggle;
+category-grouped generated reference, committed + staleness-checked; sharp +
+png-to-ico pipeline, SVG redraw recorded as follow-up if ever wanted; no
+versioned docs). The site is kept honest by four executable gates —
+`check:content`, `check:ops-ref`, `check:links`, and the build itself.
+
+Out and waiting, as scoped: deployment (Cloudflare Pages + the nutorch.com
+domain) is the next issue; blog/RSS and CI remain recorded follow-ups.
 
 ## Scope
 
