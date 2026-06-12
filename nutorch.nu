@@ -42,17 +42,24 @@ def __nutorch-encode []: any -> any {
   } else { $v }
 }
 
-# Create a tensor from native Nushell data.
-export def "nutorch tensor" [--dtype: string, --requires-grad]: any -> string {
+# Create a tensor from native Nushell data — as the argument or from $in
+# (dual input, issue 0017): one encode path either way; an explicit
+# argument wins and the pipe is silently ignored.
+export def "nutorch tensor" [data?: any, --dtype: string, --requires-grad]: any -> string {
   mut args = []
   if $dtype != null { $args = ($args | append ["--dtype" $dtype]) }
   if $requires_grad { $args = ($args | append "--requires_grad") }
-  $in | __nutorch-encode | to json -r | ^torch tensor ...$args | str trim
+  let __in = $in
+  let __data = if $data != null { $data } else { $__in }
+  $__data | __nutorch-encode | to json -r | ^torch tensor ...$args | str trim
 }
 
-# Read a tensor back as native Nushell data.
-export def "nutorch value" []: string -> any {
-  $in | ^torch value | from json | __nutorch-restore
+# Read a tensor back as native Nushell data — handle as the argument or
+# from $in (dual input, issue 0017); the argument wins when both arrive.
+export def "nutorch value" [handle?: string]: any -> any {
+  let __in = $in
+  let __out = if $handle != null { ^torch value $handle } else { $__in | ^torch value }
+  $__out | from json | __nutorch-restore
 }
 
 # Free tensors: pipe a handle, a list of handles, or pass them as args.

@@ -72,6 +72,22 @@ let fw1 = ($a | nutorch forward $model | nutorch value)
 let fw2 = (nutorch forward $model $a | nutorch value)
 if not (check "forward: both forms identical" ($fw1 == $fw2)) { $failed = true }
 
+# tensor (prelude verb): data as argument or pipe — one encode path.
+# Non-finite parity compares `to nuon` strings: nu 0.113's `==` is broken
+# for inf/NaN ([inf 2.0] == [1.5 2.0] is true; [NaN] == [NaN] is false).
+let tp = ([1.5 2.5] | nutorch tensor | nutorch value | to nuon)
+let ta = (nutorch tensor [1.5 2.5] | nutorch value | to nuon)
+if not (check "tensor: both forms identical" ($tp == $ta)) { $failed = true }
+let nfp = ([inf 2.0] | nutorch tensor | nutorch value | to nuon)
+let nfa = (nutorch tensor [inf 2.0] | nutorch value | to nuon)
+if not (check "tensor non-finite: both forms identical (nuon)" ($nfp == $nfa and ($nfp | str contains "inf"))) { $failed = true }
+
+# value (prelude verb): handle as argument or pipe.
+let vh = ([7 8 9] | nutorch tensor)
+let vp = ($vh | nutorch value | to nuon)
+let va = (nutorch value $vh | to nuon)
+if not (check "value: both forms identical" ($vp == $va)) { $failed = true }
+
 # arity errors surface from the CLI (captured via a sub-shell: a def-internal
 # external failure raises past `do | complete` in-process). Under-supply with
 # non-TTY stdin reads EOF, so the CLI says "expected N piped handle(s), got 0";

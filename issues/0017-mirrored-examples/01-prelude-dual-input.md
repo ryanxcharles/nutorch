@@ -98,3 +98,51 @@ wrapper resolving precedence nu-side and always feeding stdin is sound (compact
 JSON is single-line, the CLI's first-line read is lossless); scalar `0`/`false`
 arguments pass the `!= null` test correctly. **Second pass (verbatim-prescribed
 folds): APPROVED.**
+
+## Result
+
+**Result:** Pass
+
+`nutorch tensor [1 2 3]` and `nutorch value $h` are real — the prelude's last
+two pipeline-only verbs now take both hands.
+
+- **Both verbs reshaped in `NU_PRELUDE`** exactly as designed: `tensor` gains
+  `data?: any` (argument wins; one `__nutorch-encode` path either way), `value`
+  gains `handle?: string` (argument wins, pipe silently ignored per the 0016
+  contract). Module regenerated; staleness test green.
+- **One implementation bug caught by the harness on first run**: `$in`
+  referenced INSIDE an `if` branch evaluates to nothing in nu — the wrappers
+  must capture `let __in = $in` up front (exactly what the 0016-generated
+  wrappers already did; the hand-written prelude draft skipped it and
+  `[1.5 2.5] | nutorch tensor` fed null to the encoder). Fixed in both verbs;
+  the capture-first pattern is now uniform across the whole module.
+- **Parity harness 14/14**, including the new entries: `tensor` both forms
+  identical; the NON-FINITE case (`[inf 2.0]`) identical by `to nuon` comparison
+  (the review-mandated comparator — nu's `==` is broken for non-finites) with
+  the rendering asserted to actually contain `inf`; `value` both forms
+  identical.
+- **Gates**: fmt clean; 0-warning build; all 8 Rust suites green;
+  `train-regression.nu` passes; `check:content` and `check:tabs` green (module
+  regen broke nothing); zero website diffs; `v1/` untouched.
+
+## Conclusion
+
+The dual-input story is now total: 173 generated wrappers (issue 0016) plus
+`forward`, `step`, and now `tensor` and `value` — every operand-taking verb in
+the module accepts pipe or argument. Experiment 2 can mirror examples freely,
+choosing whichever shared shape reads best.
+
+## Result Review
+
+**Reviewer:** `adversarial-reviewer` subagent (fresh context), reviewing BEFORE
+the result commit. **First pass: CHANGES REQUIRED on one record-accuracy
+defect** — the Result claimed a 16/16 harness; the harness has 14 checks (the 16
+was the diff's added LINE count — the same count-conflation class as issue
+0016's, caught again before the record froze). Corrected to 14/14 in both
+documents. Everything substantive verified independently: both prelude defs
+capture `$in` first with argument-wins precedence; the reviewer's own probes
+covered scalar args, `[NaN]` arg-vs-pipe via nuon, and BOTH both-supplied cases
+with genuinely different operands (arg wins, provably not coincidence); the
+non-finite comparator asserts nuon equality AND an `inf` substring (no vacuous
+pass); staleness, fmt, 0-warning build, all suites, train-regression, and the
+website gates all green; plan commit 610d8b4 plan-only; `v1/` untouched.

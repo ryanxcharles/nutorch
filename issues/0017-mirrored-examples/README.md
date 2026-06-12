@@ -69,7 +69,8 @@ rendered as flat text while everything else got the two-shell treatment.
 ## Experiments
 
 - [Experiment 1: Prelude dual input — tensor and value learn both hands](01-prelude-dual-input.md)
-  — **Designed**
+  — **Pass** (both prelude verbs dual; 14/14 parity incl. the nuon-compared
+  non-finite case; the capture-$in-first nu gotcha caught by the harness)
 
 ## Scope
 
