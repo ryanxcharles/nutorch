@@ -32,9 +32,9 @@ torch add $a $b | torch value
 ```
 
 ```nu
-let a = ([1 2 3] | nutorch tensor)
-let b = ([4 5 6] | nutorch tensor)
-$a | nutorch add $b | nutorch value
+let a = (nutorch tensor [1 2 3])
+let b = (nutorch tensor [4 5 6])
+nutorch add $a $b | nutorch value
 # [5.0, 7.0, 9.0] — a native list, on the GPU
 ```
 
@@ -57,8 +57,8 @@ echo $a | torch add $b    # pipeline form: stdin fills the leftmost slot
 ```
 
 ```nu
-$a | nutorch add $b   # pipeline form: $in fills the leftmost slot
 nutorch add $a $b     # argument form
+$a | nutorch add $b   # pipeline form: $in fills the leftmost slot
 ```
 
 ## A taste of more
@@ -75,12 +75,12 @@ torch grad $w | torch value
 
 ```nu
 let m = (nutorch randn [3 3])
-print ($m | nutorch mm $m | nutorch mean | nutorch value)   # matrix product, then mean
+print (nutorch mm $m $m | nutorch mean | nutorch value)   # matrix product, then mean
 
-let w = (nutorch randn [3] --requires_grad)         # autograd is built in
-let loss = ($w | nutorch mul $w | nutorch sum)
-$loss | nutorch backward
-$w | nutorch grad | nutorch value
+let w = (nutorch randn [3] --requires_grad)               # autograd is built in
+let loss = (nutorch mul $w $w | nutorch sum)
+nutorch backward $loss
+print (nutorch grad $w | nutorch value)
 ```
 
 Run `torch ops` to list every operation (185 of them) and `torch <op> --help`

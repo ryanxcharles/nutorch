@@ -72,7 +72,8 @@ rendered as flat text while everything else got the two-shell treatment.
   — **Pass** (both prelude verbs dual; 14/14 parity incl. the nuon-compared
   non-finite case; the capture-$in-first nu gotcha caught by the harness)
 - [Experiment 2: The mirror — every pair, line for line](02-the-mirror.md) —
-  **Designed**
+  **Pass** (15/15 pairs mirrored and gate-enforced by check:mirror; the vacuous
+  `where bytes > 1mb` filter caught and fixed in three places)
 
 ## Scope
 

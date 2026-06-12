@@ -19,7 +19,7 @@ torch add $a $b --alpha 2
 ```
 
 ```nu
-$a | nutorch add $b --alpha 2
+nutorch add $a $b --alpha 2
 ```
 
 Broadcasting follows PyTorch's rules. Non-broadcastable shapes error with both
@@ -35,9 +35,9 @@ torch mean --help        # usage, parameters, defaults for any op
 ```
 
 ```nu
-nutorch ops                            # a native table — filter it
-nutorch ops | where category == "loss"
-torch mean --help                      # CLI help works here too
+nutorch ops                             # every op: a native table
+nutorch ops | where category == "loss"  # filter natively — no JSON needed
+torch mean --help                       # usage, parameters, defaults for any op
 ```
 
 Every op supports the dual input pattern — pipe the leftmost tensor in or pass

@@ -113,7 +113,7 @@ use nutorch.nu *
 
 let t = ([[1 2] [3 4]] | nutorch tensor)
 $t | nutorch mm $t | nutorch value            # a native table
-nutorch tensors | where bytes > 1mb | get handle | each {|h| nutorch free $h }
+nutorch tensors | where bytes > 1_000_000 | get handle | each {|h| nutorch free $h }
 ```
 
 Wrappers are pipeline-first (the first tensor slot is `$in`); non-finite values

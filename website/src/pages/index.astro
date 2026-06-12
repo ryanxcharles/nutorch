@@ -8,9 +8,9 @@ b=$(torch tensor '[4,5,6]')
 torch add $a $b | torch value
 # [5.0,7.0,9.0]   computed on the GPU`;
 
-const heroDemoNu = `let a = ([1 2 3] | nutorch tensor)
-let b = ([4 5 6] | nutorch tensor)
-$a | nutorch add $b | nutorch value
+const heroDemoNu = `let a = (nutorch tensor [1 2 3])
+let b = (nutorch tensor [4 5 6])
+nutorch add $a $b | nutorch value
 # [5.0, 7.0, 9.0] — a native list, on the GPU`;
 
 const bashDemo = `m=$(torch randn '[3,3]')

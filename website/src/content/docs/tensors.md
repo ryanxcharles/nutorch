@@ -22,8 +22,8 @@ cat handles.txt | torch add $b    # pipeline form
 ```
 
 ```nu
-$a | nutorch add $b   # pipeline form: $in is the leftmost tensor
-nutorch add $a $b     # argument form
+nutorch add $a $b                  # argument form
+open handles.txt | nutorch add $b  # pipeline form
 ```
 
 The rule is the **stdin prefix grammar**: stdin fills the leftmost missing
@@ -41,7 +41,7 @@ torch arange 10 --start 0 --step 2  # [0.0,2.0,4.0,6.0,8.0]
 ```
 
 ```nu
-[[1 2] [3 4]] | nutorch tensor        # from native nested lists
+nutorch tensor [[1 2] [3 4]]          # from native nested lists
 nutorch full [2 3] 7                  # shape, fill value
 nutorch randn [3 3]                   # seeded RNG ops: also rand, randint, …
 nutorch arange 10 --start 0 --step 2  # handle for [0, 2, 4, 6, 8]
@@ -75,10 +75,11 @@ torch daemon restart     # the coarse valve: export, restart, re-import
 ```
 
 ```nu
-nutorch tensors          # a NATIVE table: filter and sort it directly
-nutorch free $t1 $t2     # free specific tensors
-nutorch free --all       # empty the registry
-nutorch daemon restart   # the coarse valve
+nutorch tensors                      # a native table: handle, shape, dtype, …
+nutorch tensors | where bytes > 1_000_000  # filter natively — no JSON needed
+nutorch free $t1 $t2                 # free specific tensors
+nutorch free --all                   # empty the registry
+nutorch daemon restart               # the coarse valve
 ```
 
 ## Errors that name things

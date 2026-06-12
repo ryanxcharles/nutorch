@@ -120,3 +120,62 @@ APPROVED** — all five folds verified coherent, and the revised gate confirmed
 mechanically reachable for both pairs the first pass named (the training pair
 equalizes under the mut exception at 14=14+1-exempt; the daemon pair equalizes
 at 5=5 once comment-only lines are excluded).
+
+## Result
+
+**Result:** Pass
+
+Fifteen pairs, fifteen mirrors — and a committed gate that keeps them that way.
+
+- **All fifteen panels rewritten per the rules**: capture↔capture,
+  argument↔argument (tensor creation by argument both sides), `print` as the
+  mirror of writes-to-stdout, the nn-building pair's `--json` line mirrored
+  directly (returns a native record), the dual-input sections argument-first in
+  both panels, and the training pair carrying its one documented `mut` exception
+  with an explanatory comment.
+- **The recorded live questions, answered**: `open handles.txt | nutorch add $b`
+  works (the wrapper pipes file text; the CLI grammar reads the handle) →
+  `[5.0, 7.0, 9.0]`; `nutorch nn info $m --json` returns an ALREADY-PARSED
+  record (the passthrough special-cases it); bare `nutorch nn zero_grad $opt` is
+  clean inside a `for` body (no `| ignore` needed — the old ones removed); the
+  fully mirrored training loop reproduces `2.4584e-7`.
+- **A pre-existing honesty bug found by the verification**: the long-standing
+  `where bytes > 1mb` filter (README, nushell page, and the new census mirror)
+  was VACUOUS — `bytes` is a plain int and nu 0.113 evaluates `int > filesize`
+  as always-true (the same cross-type comparison family as the non-finite bugs).
+  All three sites fixed to `where bytes > 1_000_000`, verified live (0 matches
+  for tiny tensors, correct complement).
+- **`check:mirror` committed** (`website/scripts/check-mirror.ts`): 15/15 pairs
+  at equal command-line counts (blank/comment-only excluded), the training
+  pair's +1 exempt and documented in the script; the hero's template literals
+  included.
+- **Every rewritten form ran live verbatim** (one consolidated explicit-`use`
+  script covering all fifteen panels' forms).
+- **Gates**: build clean; `check:mirror`, `check:content`, `check:tabs` (count
+  map unchanged), `check:links`, `check:theme` all green; dprint clean; zero
+  `.rs` diffs; `v1/` untouched. Screenshots:
+  `logs/issue-0017/hero-mirror-nu-{light,dark}.png`.
+
+## Conclusion
+
+The toggle now reads as a translation: same shape, same forms, same comments,
+with the two shell-forced divergences documented rather than hidden. The
+census-filter discovery is the verification habit paying off on content that
+predates this issue. Experiment 3 brings the reference pages into the same
+world.
+
+## Result Review
+
+**Reviewer:** `adversarial-reviewer` subagent (fresh context), reviewing BEFORE
+the result commit. **Verdict: APPROVED — no Required findings.** The reviewer
+reproduced everything independently: the 15/15 mirror gate with exactly one
+documented exemption, PLUS an adversarial drift test (an injected extra nu line
+failed the gate by name — it is a real detector); the bytes-filter bug
+reproduced live (a 24-byte tensor matched `> 1mb` but not `> 1_000_000`) and all
+three fixed sites confirmed; four-plus panels run verbatim against the freshly
+built binaries (noting correctly that the brew binary is stale and pre-dates exp
+1 — verification used the repo build); all gates green; plan commit fb402c9
+plan-only; zero `.rs` diffs; `v1/` untouched. One Optional folded before commit:
+the nn-building pair's bash inline comments on the `sequential`/`forward` lines
+(pre-existing asymmetry the count-based gate cannot see) now mirrored in the nu
+panel; mirror and content gates re-run green.

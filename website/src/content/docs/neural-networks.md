@@ -22,10 +22,11 @@ torch nn info $m --json                          # the same, as JSON
 
 ```nu
 let l = (nutorch nn linear 2 3)                  # PyTorch-default init, seeded
-let m = (nutorch nn sequential $l (nutorch nn relu))
-let y = ($x | nutorch forward $m)
+let m = (nutorch nn sequential $l (nutorch nn relu))  # consumes the child handles
+let y = (nutorch forward $m $x)                  # or: $x | nutorch forward $m
 nutorch nn parameters $m                         # tensor:// handles — LIVE views
 nutorch nn info $m                               # architecture, param counts
+nutorch nn info $m --json                        # the same, as a native record
 ```
 
 Module kinds (19): `linear`, `conv1d`, `conv2d`, `conv_transpose2d`,
@@ -66,20 +67,21 @@ torch value $loss     # 6.0012 → 2.46e-7 on the reference run
 ```
 
 ```nu
-nutorch manual_seed 42 | ignore
-let x = ([[0.0] [1.0] [2.0] [3.0]] | nutorch tensor)
-let y = ([[1.0] [3.0] [5.0] [7.0]] | nutorch tensor)
+nutorch manual_seed 42
+let x = (nutorch tensor [[0.0] [1.0] [2.0] [3.0]])
+let y = (nutorch tensor [[1.0] [3.0] [5.0] [7.0]])
 let model = (nutorch nn linear 1 1)
 let opt = (nutorch nn sgd $model --lr 0.05)
 
-mut loss = ""
+mut loss = ""   # nu: a binding that outlives a loop is mut
 for i in 1..200 {
-  $loss = ($x | nutorch forward $model | nutorch mse_loss $y)
-  $loss | nutorch backward
-  $opt | nutorch step
-  nutorch nn zero_grad $opt | ignore
+  let pred = (nutorch forward $model $x)
+  $loss = (nutorch mse_loss $pred $y)
+  nutorch backward $loss
+  nutorch step $opt
+  nutorch nn zero_grad $opt
 }
-print ($loss | nutorch value)   # 6.0012 → 2.46e-7 on the reference run
+print (nutorch value $loss)   # 6.0012 → 2.46e-7 on the reference run
 ```
 
 Optimizers: `sgd`, `adam`, `adamw`, `rmsprop` — with the PyTorch defaults and
