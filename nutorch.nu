@@ -62,6 +62,15 @@ export def "nutorch value" [handle?: string]: any -> any {
   $__out | from json | __nutorch-restore
 }
 
+# A tensor's dimensions as a native list of ints — handle as the argument
+# or from $in (dual input, issue 0018); the argument wins when both arrive.
+# No restore: dims are always finite ints, never the non-finite token dialect.
+export def "nutorch shape" [handle?: string]: any -> list<int> {
+  let __in = $in
+  let __out = if $handle != null { ^torch shape $handle } else { $__in | ^torch shape }
+  $__out | from json
+}
+
 # Free tensors: pipe a handle, a list of handles, or pass them as args.
 export def "nutorch free" [...handles: string, --all]: any -> nothing {
   if $all {

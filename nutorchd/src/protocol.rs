@@ -22,6 +22,10 @@ pub enum Bespoke {
         handle: String,
         meta: Option<bool>,
     },
+    /// A tensor's dimensions as a list of ints (issue 0018).
+    Shape {
+        handle: String,
+    },
     /// Free tensors by handle, or all of them. Exactly one of the two
     /// fields must be meaningfully present (validated in dispatch;
     /// `all: false` counts as "not requested").

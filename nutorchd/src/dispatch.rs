@@ -32,8 +32,8 @@ pub fn parse_request(line: &str) -> Result<Request, Response> {
         .ok_or_else(|| Response::error("bad_request", "request has no op"))?
         .to_string();
     match name.as_str() {
-        "tensor" | "value" | "free" | "tensors" | "nn" | "forward" | "nn_parameters" | "step"
-        | "nn_zero_grad" | "nn_set_lr" | "nn_mode" | "nn_save" | "nn_load" | "nn_info"
+        "tensor" | "value" | "shape" | "free" | "tensors" | "nn" | "forward" | "nn_parameters"
+        | "step" | "nn_zero_grad" | "nn_set_lr" | "nn_mode" | "nn_save" | "nn_load" | "nn_info"
         | "status" | "set_ttl" | "shutdown" => {
             let bespoke: Bespoke = serde_json::from_value(raw)
                 .map_err(|e| Response::error("bad_request", format!("bad request: {e}")))?;
@@ -142,6 +142,14 @@ pub fn handle_request(
                             Err(e) => (Response::error("torch_error", e), false),
                         }
                     }
+                    Err(lookup) => (Response::error(lookup.code(), lookup.message()), false),
+                }
+            }
+            Bespoke::Shape { handle } => {
+                lifecycle.lock().unwrap().touch();
+                registry.touch(&handle);
+                match registry.get_tensor(&handle) {
+                    Ok(tensor) => (Response::value(serde_json::json!(tensor.size())), false),
                     Err(lookup) => (Response::error(lookup.code(), lookup.message()), false),
                 }
             }
@@ -2193,6 +2201,41 @@ mod tests {
             message.contains("[2, 3]") && message.contains("[4]"),
             "{message}"
         );
+    }
+
+    #[test]
+    fn shape_returns_dims() {
+        let mut registry = Registry::new();
+        let h = expect_handles(run(
+            &mut registry,
+            json!({"op":"full","params":{"shape":[2, 3],"value":1}}),
+        ))
+        .pop()
+        .unwrap();
+        assert_eq!(
+            expect_value(run(&mut registry, json!({"op":"shape","handle":h}))),
+            json!([2, 3])
+        );
+    }
+
+    #[test]
+    fn shape_of_scalar_is_empty() {
+        let mut registry = Registry::new();
+        let s = tensor_of(&mut registry, json!(3.0));
+        assert_eq!(
+            expect_value(run(&mut registry, json!({"op":"shape","handle":s}))),
+            json!([])
+        );
+    }
+
+    #[test]
+    fn shape_rejects_unknown_handle() {
+        let mut registry = Registry::new();
+        let (code, _) = expect_error(run(
+            &mut registry,
+            json!({"op":"shape","handle":"tensor://nope"}),
+        ));
+        assert_eq!(code, "unknown_handle");
     }
 
     #[test]

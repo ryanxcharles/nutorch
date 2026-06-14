@@ -88,6 +88,12 @@ let vp = ($vh | nutorch value | to nuon)
 let va = (nutorch value $vh | to nuon)
 if not (check "value: both forms identical" ($vp == $va)) { $failed = true }
 
+# shape (prelude verb): handle as argument or pipe.
+let sh = ([[1 2 3] [4 5 6]] | nutorch tensor)
+let sp = ($sh | nutorch shape)
+let sa = (nutorch shape $sh)
+if not (check "shape: both forms identical" ($sp == $sa and $sp == [2 3])) { $failed = true }
+
 # arity errors surface from the CLI (captured via a sub-shell: a def-internal
 # external failure raises past `do | complete` in-process). Under-supply with
 # non-TTY stdin reads EOF, so the CLI says "expected N piped handle(s), got 0";

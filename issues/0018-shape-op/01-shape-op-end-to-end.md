@@ -204,8 +204,89 @@ Findings addressed:
 
 ## Result
 
-_(to be recorded after implementation)_
+**Result:** Pass
+
+Implemented exactly as designed across the three layers plus tests:
+
+- `nutorchd/src/protocol.rs`: added the `Shape { handle }` bespoke variant.
+- `nutorchd/src/dispatch.rs`: added `"shape"` to the bespoke route and a
+  `Bespoke::Shape` handler returning `serde_json::json!(tensor.size())`; added
+  three unit tests (`shape_returns_dims`, `shape_of_scalar_is_empty`,
+  `shape_rejects_unknown_handle`).
+- `torch-cli/src/main.rs`: added the `"shape"` arm to `build_bespoke_request`,
+  the `NU_PRELUDE` `nutorch shape` wrapper, and the two help entries.
+- `nutorch.nu`: regenerated (`torch nu-module`); diff is exactly the 9-line
+  `nutorch shape` wrapper, nothing else.
+- `scripts/test-dual-input.nu`: added the `shape` parity entry.
+
+Gate results:
+
+- `cargo fmt -- --check` — clean.
+- `cargo build --release` — clean, no warnings.
+- `cargo test --release -p nutorchd --lib` — **82 passed, 0 failed**, including
+  the three new `shape` tests.
+- CLI bash form (live): `torch shape $t` → `[2,3]`; pipeline `| cat` → `[2,3]`;
+  stdin handle (`echo $t | torch shape`) → `[2,3]`; scalar → `[]`. All three
+  error paths exit non-zero with the right Rust-side message: `tensor://nope` →
+  "unknown handle", `nope` → "malformed handle", an `nn://` handle → "refers to
+  a module, not a tensor".
+- Nushell mirrored form (live): both `nutorch shape $t` and `$t | nutorch shape`
+  → native `[2, 3]`; scalar → `[]`.
+- `nu scripts/test-dual-input.nu` — `ok  shape: both forms identical` and
+  `PASS: dual input parity (nushell module)`.
+
+Two notes, neither a `shape` defect:
+
+- **Pre-existing golden failure (out of scope).** `cargo test`'s
+  `tests/golden.rs` `nn_linear_*` cases fail on this machine — confirmed by
+  stashing all changes and re-running on the clean tree (they fail there too).
+  It is an environment mismatch (this machine's torch 2.11.0 produces different
+  `nn.linear` default-init / gelu / sigmoid values than the committed golden
+  vectors), unrelated to issue 0018, which does not touch nn.
+- **Stale-binary gotcha during verification.** The first workspace
+  `cargo build --release` did not relink the `nutorchd` binary with the dispatch
+  edits even though the lib (and its tests) had them, so the auto-started daemon
+  briefly answered `unknown op: shape`. A forced
+  `cargo build --release --bin
+  nutorchd` produced the correct binary (size
+  changed), after which every live check passed. No code consequence — a
+  build-cache artifact, not a `shape` bug.
 
 ## Conclusion
 
-_(to be recorded after implementation)_
+`shape` is restored end to end: `torch shape <t>` / `$t | torch shape` and the
+`nutorch shape` wrapper return a tensor's dimensions as a JSON int list / native
+`list<int>`, with dual input, the 0-dim `[]` case, and three clean error paths —
+mirroring the `value` bespoke op at every layer. This was the one piece of v1's
+implemented command surface missing from v2; with it landed, v2 covers all of
+v1's ops (minus the intentionally-removed `devices`) plus the ~140 additional
+ops and the nn/optim subsystem.
+
+The issue's goal is met in a single experiment; no further experiment is needed.
+A possible (separate, out-of-scope) follow-up surfaced: regenerate the golden
+vectors against torch 2.11.0 so `cargo test`'s golden suite passes on current
+toolchains — its own issue, not this one.
+
+## Completion review
+
+**Reviewer:** in-session `adversarial-reviewer` subagent (fresh context,
+read-only). **Verdict: APPROVED** — zero findings (no Required, Optional, or
+Nit). It independently reproduced the gates and verifications rather than taking
+the Result section's word:
+
+- Diff matches the claims exactly — the 7 named files, no unrequested changes.
+- Handler correct (`dispatch.rs:148-155`): lease+tensor touch like `value`,
+  `registry.get_tensor` kind-check, `Response::value(json!(tensor.size()))`
+  serializing `Vec<i64>` as a JSON int array; 0-dim → `[]` sound.
+- The 3 unit tests are non-tautological and assert real values.
+- Gates reproduced: `cargo fmt -- --check` exit 0; full `cargo build --release`
+  zero warnings; `cargo test --release -p nutorchd --lib` 82/0.
+- Golden claim verified plausible: `nn_linear_*` failures are in
+  `tests/golden.rs` (not the `--lib` gate) and `shape` touches no nn code.
+- `nutorch.nu` confirmed genuinely regenerated
+  (`torch nu-module | diff -
+  nutorch.nu` identical), not hand-edited.
+- Live dual input, PyTorch fidelity, and Rust-side error messages all confirmed;
+  the parity script prints `ok shape` and `PASS`.
+- Workflow position correct: plan commit `e5b8089` is docs-only and precedes the
+  implementation, which awaits this separate result commit.

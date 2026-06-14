@@ -435,6 +435,13 @@ fn build_bespoke_request(args: &RawArgs) -> Result<serde_json::Value, String> {
             let handle = positional_or_stdin(args, 0, "tensor handle")?;
             Ok(serde_json::json!({ "op": "value", "handle": handle, "meta": meta }))
         }
+        "shape" => {
+            if let Some((name, _)) = args.flags.first() {
+                return Err(format!("unknown flag: --{name}"));
+            }
+            let handle = positional_or_stdin(args, 0, "tensor handle")?;
+            Ok(serde_json::json!({ "op": "shape", "handle": handle }))
+        }
         "free" => {
             let mut all = false;
             for (name, _) in &args.flags {
@@ -894,12 +901,14 @@ fn print_ops() {
         "tensor"
     );
     println!("  {:<14} read a tensor back as JSON", "value");
+    println!("  {:<14} a tensor's dimensions as a list of ints", "shape");
 }
 
 fn print_op_help(op: &str) {
     match op {
         "tensor" => println!("usage: torch tensor <json-data> [--dtype <kind>]"),
         "value" => println!("usage: torch value [handle]   (or pipe the handle in)"),
+        "shape" => println!("usage: torch shape [handle]   (or pipe the handle in)"),
         "daemon" => println!("usage: torch daemon <status|ttl|stop|restart|start>"),
         name => {
             if let Some(spec) = nutorch_ops::find(name) {
@@ -1102,6 +1111,15 @@ export def "nutorch value" [handle?: string]: any -> any {
   let __in = $in
   let __out = if $handle != null { ^torch value $handle } else { $__in | ^torch value }
   $__out | from json | __nutorch-restore
+}
+
+# A tensor's dimensions as a native list of ints — handle as the argument
+# or from $in (dual input, issue 0018); the argument wins when both arrive.
+# No restore: dims are always finite ints, never the non-finite token dialect.
+export def "nutorch shape" [handle?: string]: any -> list<int> {
+  let __in = $in
+  let __out = if $handle != null { ^torch shape $handle } else { $__in | ^torch shape }
+  $__out | from json
 }
 
 # Free tensors: pipe a handle, a list of handles, or pass them as args.

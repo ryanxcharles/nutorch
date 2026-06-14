@@ -88,7 +88,8 @@ prejudged here):
 ## Experiments
 
 - [Experiment 1: `shape` end to end — daemon, CLI, Nushell](01-shape-op-end-to-end.md)
-  — **Designed**
+  — **Pass** (shape op across daemon/CLI/Nushell; dual input, 0-dim `[]`, three
+  error paths; 82 lib tests green incl. 3 new; parity script passes)
 
 ## Scope
 
