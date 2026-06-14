@@ -2,8 +2,9 @@
 
 ## Open
 
-| # | Title | Opened |
-| - | ----- | ------ |
+| #                                           | Title                          | Opened     |
+| ------------------------------------------- | ------------------------------ | ---------- |
+| [0019](0019-shape-on-the-website/README.md) | `shape` joins the website docs | 2026-06-14 |
 
 ## Closed
 
