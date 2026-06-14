@@ -85,6 +85,11 @@ prejudged here):
   line-for-line bash/nu pairs and are gate-checked (`check:mirror`); the verb
   scan covers new fences. Adding `shape` to docs inherits those gates.
 
+## Experiments
+
+- [Experiment 1: `shape` end to end — daemon, CLI, Nushell](01-shape-op-end-to-end.md)
+  — **Designed**
+
 ## Scope
 
 In (intended): the `shape` op end-to-end — daemon handler, CLI arm, Nushell
