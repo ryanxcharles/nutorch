@@ -2,8 +2,9 @@
 
 ## Open
 
-| # | Title | Opened |
-| - | ----- | ------ |
+| #                                            | Title                | Opened     |
+| -------------------------------------------- | -------------------- | ---------- |
+| [0020](0020-nushell-torch-command/README.md) | Nushell uses `torch` | 2026-06-14 |
 
 ## Closed
 
