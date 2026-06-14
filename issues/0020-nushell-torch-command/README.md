@@ -92,3 +92,5 @@ Out:
 - [Experiment 1: Rename the Nushell namespace](01-rename-nushell-namespace.md) —
   **Partial** (rename works; full verification blocked by unchanged NN golden
   failures and missing Chrome for `check:tabs`)
+- [Experiment 2: Clear the remaining verification blockers](02-clear-verification-blockers.md)
+  — **Designed**
