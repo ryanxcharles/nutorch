@@ -86,7 +86,7 @@ try {
     "docs/": 3, // renders getting-started
     "docs/getting-started/": 3,
     "docs/daemon/": 1,
-    "docs/tensors/": 3,
+    "docs/tensors/": 4,
     "docs/ops/": 2,
     "docs/autograd/": 2,
     "docs/neural-networks/": 3,

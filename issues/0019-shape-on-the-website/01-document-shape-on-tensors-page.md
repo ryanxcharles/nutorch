@@ -4,8 +4,8 @@
 
 Add a mirrored bash/nu example documenting `shape` to `tensors.md`, and the
 honesty-gate allowlist entry it requires, then prove every site gate stays
-green. One experiment covers the whole change — it is two small edits plus
-verification.
+green. One experiment covers the whole change — it is three small edits (two
+gate scripts plus the doc) plus verification.
 
 ## Changes
 
@@ -114,8 +114,73 @@ Findings addressed:
 
 ## Result
 
-_(to be recorded after implementation)_
+**Result:** Pass
+
+Implemented the three edits as designed:
+
+- `website/scripts/check-content.ts`: added `"shape"` to `NON_OP_VERBS`.
+- `website/scripts/check-shell-tabs.ts`: bumped `EXPECTED["docs/tensors/"]` `3`
+  → `4`.
+- `website/src/content/docs/tensors.md`: added the `## Shape` section with the
+  mirrored bash/nu pair.
+
+Verification (`bun install` run first — `node_modules` was absent):
+
+- **Live output:** `torch shape $t` → `[2,3]`; `nutorch shape $t` → a native
+  `list<int>` (`[2, 3]`). Matches the doc.
+- **`check:content`** — passes (`content checks passed`). Demonstrated to depend
+  on the allowlist edit: temporarily removing `"shape"` makes it FAIL with
+  `unknown verb 'torch shape'`; restoring it passes again.
+- **`check:mirror`** — `mirror gate passed`; the new pair reports
+  `ok tensors.md:2: bash=2 nu=2` (the page now has four balanced pairs).
+- **`check:links`** — `links ok: 20 pages checked`.
+- **`check:ops-ref`** — `ops reference current (185 ops, 9 pages)` — unaffected,
+  as predicted (`shape` is bespoke).
+- **`bun run build`** — completes; the page renders with `<h2 id="shape">Shape`.
+- **`check:tabs`** — its substantive assertion verified directly against the
+  built HTML: `dist/docs/tensors/index.html` contains exactly **4**
+  `class="shell-tabs` groups, matching the `EXPECTED` bump to `4` (the gate's
+  check is `count === expected`).
+
+Environment limitation (not a defect): `check:tabs` and `check:theme` drive a
+served build over CDP and require Google Chrome at
+`/Applications/Google Chrome.app`, which is **not installed on this machine**,
+so the full gates could not be executed here. `check:theme` is unrelated to this
+change (theme matrix). For `check:tabs`, the count assertion — the only part
+this change affects — was confirmed against the same built HTML the gate
+fetches. On a machine with Chrome, run
+`bun run build && bun run preview --port 4399` then `bun run check:tabs` to
+execute it end to end.
 
 ## Conclusion
 
-_(to be recorded after implementation)_
+`shape` is now documented on the website: the Tensors page gains a `## Shape`
+section with a mirrored bash/nu example, rendered as a fourth shell-tab group,
+and the honesty scan accepts the new verb. The three site gates this change
+touches (`check:content`, `check:mirror`, and the `check:tabs` count) are all
+satisfied — the first two executed green here, the third verified against the
+built HTML pending a Chrome-equipped run. This completes the website-docs piece
+that issue 0018 scoped but left undone, so `shape` is now documented everywhere
+its bespoke siblings are: CLI help and the docs site.
+
+## Completion review
+
+**Reviewer:** in-session `adversarial-reviewer` subagent (fresh context,
+read-only). **Verdict: APPROVED** — no Required or Optional findings. It
+independently reproduced every load-bearing claim: the diff is exactly the three
+source edits plus the issue docs (nothing extraneous); `check:content`,
+`check:mirror` (new pair `ok tensors.md:2: bash=2 nu=2`), `check:links`, and
+`check:ops-ref` (185 ops, unchanged) all pass; Chrome is genuinely absent and
+both CDP gates hardcode its path, so attributing them to that is accurate;
+`bun run build` yields exactly 4 `class="shell-tabs` groups on the tensors page
+(matching the bump) and renders `<h2 id="shape">`; live
+`nutorch shape $t |
+describe` is `list<int>`; `dprint check` clean; plan and
+result commits are separate.
+
+- **[Nit] nu annotation vs REPL rendering.** The doc's `# → [2, 3]` is the
+  logical list value; interactive Nushell renders a `list<int>` as a vertical
+  table. Reviewer marked it acceptable (the parenthetical "(a native
+  `list<int>`)" discloses the type, and it matches the page's existing
+  convention of annotating values inline, e.g. `arange … # [0, 2, 4, 6, 8]`).
+  Left as-is.

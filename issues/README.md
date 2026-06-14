@@ -2,14 +2,14 @@
 
 ## Open
 
-| #                                           | Title                          | Opened     |
-| ------------------------------------------- | ------------------------------ | ---------- |
-| [0019](0019-shape-on-the-website/README.md) | `shape` joins the website docs | 2026-06-14 |
+| # | Title | Opened |
+| - | ----- | ------ |
 
 ## Closed
 
 | #                                                     | Title                                                                              | Opened     | Closed     |
 | ----------------------------------------------------- | ---------------------------------------------------------------------------------- | ---------- | ---------- |
+| [0019](0019-shape-on-the-website/README.md)           | `shape` joins the website docs                                                     | 2026-06-14 | 2026-06-14 |
 | [0018](0018-shape-op/README.md)                       | `shape` — a tensor's dimensions, on demand                                         | 2026-06-14 | 2026-06-14 |
 | [0017](0017-mirrored-examples/README.md)              | Mirrored examples, everywhere — including the reference                            | 2026-06-12 | 2026-06-12 |
 | [0016](0016-dual-input-nushell/README.md)             | The Dual Input Pattern reaches Nushell                                             | 2026-06-12 | 2026-06-12 |

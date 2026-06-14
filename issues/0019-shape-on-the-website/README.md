@@ -1,6 +1,7 @@
 +++
-status = "open"
+status = "closed"
 opened = "2026-06-14"
+closed = "2026-06-14"
 +++
 
 # Issue 19: `shape` joins the website docs
@@ -75,7 +76,9 @@ the 0-dim `[]` case in the doc or keep the example to the common 2-D case.
 ## Experiments
 
 - [Experiment 1: document `shape` on the Tensors page](01-document-shape-on-tensors-page.md)
-  — **Designed**
+  — **Pass** (Shape section + mirrored pair on tensors.md; check:content,
+  check:mirror, check:links, check:ops-ref, build all green; check:tabs count
+  bump verified against built HTML — CDP gates need Chrome, absent here)
 
 ## Scope
 
@@ -85,3 +88,27 @@ gate; verifying all site gates pass. Out: changing the `shape` op itself (issue
 0018, done and closed); the generated op-table reference (bespoke ops stay out,
 per issue 0018); regenerating golden vectors (separate future work); any other
 doc page beyond what documenting `shape` naturally requires.
+
+## Conclusion
+
+**Solved in one experiment.** The Tensors page now has a `## Shape` section with
+a mirrored bash/nu example, and `shape` is on the docs site alongside its
+bespoke siblings (`value`/`free`/`tensors`). Three edits: the honesty-scan
+allowlist (`check-content.ts`), the tab-group count (`check-shell-tabs.ts`, `3`
+→ `4`), and the doc itself.
+
+The design-review gate caught a Required miss — the hardcoded `check:tabs` count
+that the new tab group would otherwise have failed — which was folded into the
+plan before implementation. The result-review gate approved with no Required or
+Optional findings.
+
+Gates: `check:content`, `check:mirror`, `check:links`, `check:ops-ref`, and
+`bun run build` executed green on this machine; the `check:tabs` count assertion
+was verified directly against the built HTML (exactly four `shell-tabs` groups
+on the tensors page). The two CDP-driven gates (`check:tabs`, `check:theme`)
+could not be fully executed here because Google Chrome is not installed — an
+environment limitation, not a defect; rerun them on a Chrome-equipped machine
+with `bun run build && bun run preview --port 4399` then `bun run check:tabs`.
+
+With this, `shape` (issue 0018) is documented everywhere its siblings are, and
+the v1→v2 surface gap is fully closed and surfaced to users.

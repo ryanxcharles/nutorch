@@ -50,6 +50,24 @@ nutorch arange 10 --start 0 --step 2  # handle for [0, 2, 4, 6, 8]
 Run `torch ops` and look at the `creation` category for the full set; every op
 documents itself with `torch <op> --help`.
 
+## Shape
+
+A tensor's dimensions come back as a list — `torch shape` for one handle, the
+same shape the `tensors` census shows per row:
+
+```bash
+t=$(torch full '[2,3]' 7)   # a 2×3 tensor
+torch shape $t              # → [2,3]
+```
+
+```nu
+let t = (nutorch full [2 3] 7)   # a 2×3 tensor
+nutorch shape $t                 # → [2, 3]   (a native list<int>)
+```
+
+The bash form prints compact JSON; the nu wrapper returns a native `list<int>`,
+so it composes with `length`, `get`, and the rest of Nushell.
+
 ## Export and import — persistence is redirection
 
 Tensors live exactly as long as the daemon. To keep one, export it; to restore

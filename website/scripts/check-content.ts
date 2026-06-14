@@ -22,6 +22,7 @@ if (!fence || fence[1] !== INSTALL) {
 const NON_OP_VERBS = new Set([
   "tensor",
   "value",
+  "shape",
   "free",
   "tensors",
   "forward",
