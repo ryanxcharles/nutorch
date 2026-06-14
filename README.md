@@ -1,160 +1,30 @@
-# Nutorch
+# NuTorch
 
-**GPU-accelerated PyTorch tensor operations from any shell.**
+**PyTorch-style GPU tensor operations from any shell.**
 
-Nutorch is **nutorchd**: a standalone daemon that owns a tensor database (backed
-by [tch-rs](https://github.com/LaurentMazare/tch-rs) / LibTorch, the C++ engine
-behind [PyTorch](https://pytorch.org/)) and serves thin CLI clients over a Unix
-socket. Tensors are referenced by string identifiers, so handles flow through
-ordinary pipelines — in bash, zsh, fish, or any other shell.
-[Nushell](https://www.nushell.sh/) remains the premium client, with structured
-data and native serialization.
+NuTorch is a shell interface to GPU tensors. A background daemon, `nutorchd`,
+owns the tensor registry, LibTorch context, GPU memory, and autograd graphs. The
+`torch` CLI sends one operation per invocation over a Unix socket and prints
+plain string handles, so tensor programs compose in bash, zsh, fish, Nushell,
+and scripts.
 
-**GPU-only, by design.** Every tensor lives on the GPU — that is the point of
-the library. There is no device option. **Requires an Apple-silicon Mac** (the
-GPU is MPS); the daemon refuses to start without it. Mac-only for now.
+Nushell gets a generated structured module with native lists, tables, and
+records. POSIX shells get ordinary stdin/stdout composition.
+
+NuTorch is GPU-only on Apple silicon. Every tensor lives on Metal through MPS;
+there is no CPU mode and no per-tensor device option. The daemon refuses to
+start without MPS.
 
 ```bash
-# Working today (PoC):
 a=$(torch tensor '[1,2,3]')
 b=$(torch tensor '[4,5,6]')
 torch add $a $b | torch value
-# → [5.0,7.0,9.0]   (computed on the GPU)
+# [5.0,7.0,9.0]   computed on the GPU
 ```
-
-## The daemon
-
-You never start the daemon — any `torch` command starts it automatically if it
-isn't running. It shuts itself down after **1 hour of inactivity** (every tensor
-operation renews the lease), so your tensors last long enough to be useful
-without holding GPU memory you've stopped using. Tensors live exactly as long as
-the daemon — that's the memory-horizon contract.
-
-```bash
-torch daemon status      # pid, ttl, idle time, time remaining,
-                         # tensor count, memory held, socket, log
-torch daemon ttl 4h      # change the idle TTL on the live daemon (none = forever)
-torch daemon stop        # shut down now
-torch daemon restart     # fresh daemon, empty registry
-```
-
-The default TTL is configurable via `NUTORCHD_TTL` (e.g. `30m`, `2h`, `none`).
-
-Run `torch ops` to list every available operation, and `torch <op> --help` for
-any one of them.
-
-## Neural networks
-
-Modules are daemon-resident objects with `nn://` handles, composed and run from
-the shell:
-
-```bash
-l=$(torch nn linear 2 3)                         # PyTorch-default init, seeded
-m=$(torch nn sequential $l "$(torch nn relu)")   # consumes the child handles
-y=$(torch forward $m $x)                         # or: $x | torch forward $m
-torch nn parameters $m                           # tensor:// handles — LIVE views
-torch nn info $m
-```
-
-Module kinds:
-`linear conv1d conv2d conv_transpose2d embedding layer_norm
-batch_norm group_norm dropout relu sigmoid tanh gelu leaky_relu softmax
-max_pool2d avg_pool2d flatten sequential`;
-optimizers: `sgd adam adamw
-rmsprop` (see `torch nn <kind> --help`-style usage
-errors for each). `torch nn train|eval $m` switches dropout/batch_norm behavior.
-
-Save and load a model's state (safetensors — PyTorch-interchangeable, including
-buffers): `torch nn save $m model.safetensors`, then
-`torch nn load $fresh model.safetensors` into a same-architecture module.
-
-Losses are ordinary ops: `torch mse_loss $pred $target | torch backward` (also
-`cross_entropy`, `l1_loss`, `binary_cross_entropy_with_logits`, … — see
-`torch ops` under `loss`).
-
-Parameter handles alias the module's weights (the live-view contract): gradients
-populate through them after `backward`, and optimizer steps (coming in this
-issue) will be visible through them. Pretrained weights load at construction:
-`torch nn linear 2 3 --weight $w --bias-tensor $b` (deep-copied; your tensors
-are never mutated).
-
-## Autograd
-
-Gradients flow through any pipeline — libtorch records the graph automatically
-once a tensor requires them:
-
-```bash
-w=$(torch randn '[3]' --requires_grad)
-loss=$(torch mul $w $w | torch sum)
-torch backward $loss            # gradients ACCUMULATE across calls
-torch grad $w | torch value     # a snapshot: later backwards won't change it
-torch zero_grad $w              # reset; grad now reads as zeros
-d=$(torch detach $w)            # graph-free reference (stops tracking)
-```
-
-Rules of the road: `backward` needs a scalar loss (reduce first) on a tensor
-that requires gradients; `grad` before any backward is an error; rebuilding the
-graph (re-running the pipeline) before each backward is required — a second
-backward through the SAME graph errors, as in PyTorch. Graph lifetime: freeing
-an intermediate's handle is safe (the graph holds the tensor internally until
-the graph itself dies), but keep your LEAF handles — they are the only key to
-their gradients. `torch tensors` counts only registry handles; graph-held
-storage is invisible to it.
-
-## Nushell
-
-A generated module gives Nushell native structured data over the same daemon —
-and with a Homebrew install it AUTOLOADS: new Nushell sessions have `nutorch`
-commands with zero setup (`torch nu-module | save -f nutorch.nu` regenerates the
-module; a current copy is committed at the repo root):
-
-```nu
-use nutorch.nu *
-
-let t = ([[1 2] [3 4]] | nutorch tensor)
-$t | nutorch mm $t | nutorch value            # a native table
-nutorch tensors | where bytes > 1_000_000 | get handle | each {|h| nutorch free $h }
-```
-
-Wrappers are pipeline-first (the first tensor slot is `$in`); non-finite values
-cross the boundary as REAL Nushell NaN/infinity floats (the JSON dialect is
-handled for you). The structured verbs also serve plain JSON anywhere via
-`--json`: `torch tensors --json`, `torch ops --json`, `torch nn info $m --json`,
-`torch daemon status --json`. See `scripts/train-regression.nu` for a full
-training loop in Nushell.
-
-## Saving tensors and reclaiming memory
-
-Handles are typed strings — `tensor://<id>` today, with `nn://` (modules) and
-`optim://` (optimizers) arriving in issue 0009 — so a handle in a script or a
-log always says what it refers to, and using the wrong kind is a named error
-rather than a mystery.
-
-Tensors live exactly as long as the daemon (default idle TTL: 1 hour).
-Persistence is shell redirection — export the tensors you care about, never the
-intermediates:
-
-```bash
-torch value --meta $w > w.json          # export (dtype travels inside)
-w=$(torch tensor "$(cat w.json)")       # re-import, dtype preserved
-```
-
-Reclaim memory selectively or wholesale:
-
-```bash
-torch tensors            # list: handle, shape, dtype, bytes, age, idle
-torch free $t1 $t2       # free specific tensors (or pipe handles in)
-torch free --all         # empty the registry
-torch daemon restart     # the coarse valve: export, restart, re-import
-```
-
-Note: JSON has no NaN/Infinity, so `torch value` writes the string tokens
-`"NaN"`, `"Infinity"`, and `"-Infinity"` for non-finite values, and
-`torch tensor` reads them back — round-trips are lossless.
 
 ## Installing
 
-With [Homebrew](https://brew.sh) (Apple silicon):
+With [Homebrew](https://brew.sh) on Apple silicon:
 
 ```bash
 brew tap nutorch/nutorch
@@ -162,26 +32,195 @@ brew trust nutorch/nutorch   # brew 6.0+ requires trusting third-party taps
 brew install nutorch
 ```
 
-A prebuilt bottle pours in seconds where one matches your macOS; otherwise brew
-builds from the release tarball (needs Rust, ~1 minute). The CLI answers to both
-names — `torch` (PyTorch muscle memory) and `nutorch` (a symlink to the same
-binary, from the next release). The formula's source of truth is
-`dist/nutorch.rb`; the tap lives at
+Homebrew pours a prebuilt bottle when one matches your macOS. Otherwise it
+builds from the pinned release tarball.
+
+The installed CLI is available as both `torch` and `nutorch`. In the Homebrew
+formula and source installer, `nutorch` is a symlink to `torch`.
+
+The formula source lives at `dist/nutorch.rb`; the published tap is
 [nutorch/homebrew-nutorch](https://github.com/nutorch/homebrew-nutorch).
 
-### From source
+### From Source
 
 ```bash
 git clone https://github.com/nutorch/nutorch
 cd nutorch
-scripts/bootstrap.sh     # venv + torch 2.11.0 + release build (idempotent)
-scripts/install.sh       # → ~/.nutorch (or pass a prefix); add ~/.nutorch/bin to PATH
+scripts/bootstrap.sh     # venv + torch 2.11.0 + release build
+scripts/install.sh       # installs to ~/.nutorch by default
 torch --version
 ```
 
-The installed binaries are relocatable: libtorch's required dylibs are copied
-into the prefix and resolved by a baked relative rpath — no environment
-variables, no checkout needed at runtime.
+Add `~/.nutorch/bin` to `PATH`, or pass a prefix to `scripts/install.sh`.
+
+The installed binaries are relocatable. The required LibTorch dylibs are copied
+into the install prefix and resolved by a baked relative rpath, so the install
+does not need environment variables or the source checkout at runtime.
+
+## The Daemon
+
+Normal `torch` commands start `nutorchd` automatically when it is not already
+running. The daemon shuts itself down after 1 hour of inactivity by default;
+tensor operations renew that idle lease. Tensors live exactly as long as the
+daemon.
+
+```bash
+torch daemon status      # pid, version, device, ttl, tensor count, socket, log
+torch daemon ttl 4h      # change the live daemon's idle TTL
+torch daemon stop        # shut down now
+torch daemon restart     # fresh daemon, empty registry
+torch daemon start       # start without running an operation
+```
+
+Set `NUTORCHD_TTL` to change the default TTL, for example `30m`, `2h`, or
+`none`.
+
+Run `torch ops` to list the operation table. For table operations, run
+`torch <op> --help`, for example `torch add --help`.
+
+## Handles and Pipelines
+
+Tensor data stays in the daemon. The shell only sees typed handles such as
+`tensor://...`, `nn://...`, and `optim://...`.
+
+Every table operation accepts tensors either as arguments or from stdin:
+
+```bash
+torch add $a $b           # argument form
+echo $a | torch add $b    # pipeline form: stdin fills the leftmost tensor slot
+```
+
+Nushell wrappers follow the same pattern:
+
+```nu
+nutorch add $a $b
+$a | nutorch add $b
+```
+
+## Neural Networks
+
+Modules are daemon-resident objects with `nn://` handles. Optimizers are
+daemon-resident objects with `optim://` handles.
+
+```bash
+l=$(torch nn linear 2 3)                         # PyTorch-default init
+m=$(torch nn sequential $l "$(torch nn relu)")   # consumes the child handles
+y=$(torch forward $m $x)                         # or: echo $x | torch forward $m
+torch nn parameters $m                           # live tensor:// parameter views
+torch nn info $m
+```
+
+Module kinds:
+
+```text
+linear conv1d conv2d conv_transpose2d embedding layer_norm
+batch_norm group_norm dropout relu sigmoid tanh gelu leaky_relu softmax
+max_pool2d avg_pool2d flatten sequential
+```
+
+Optimizer kinds:
+
+```text
+sgd adam adamw rmsprop
+```
+
+Training uses ordinary tensor operations plus optimizer handles:
+
+```bash
+opt=$(torch nn sgd $m --lr 0.05)
+loss=$(torch mse_loss $pred $target)
+torch backward $loss
+torch step $opt
+torch nn zero_grad $opt
+```
+
+`torch nn train $m` and `torch nn eval $m` switch training/eval behavior for
+modules such as dropout and batch norm.
+
+Save and load model state with safetensors:
+
+```bash
+torch nn save $m model.safetensors
+torch nn load $fresh model.safetensors
+```
+
+The saved state is PyTorch-interchangeable and includes buffers. Loading expects
+a same-architecture module.
+
+## Autograd
+
+LibTorch records the computation graph automatically once a tensor requires
+gradients:
+
+```bash
+w=$(torch randn '[3]' --requires_grad)
+loss=$(torch mul $w $w | torch sum)
+torch backward $loss
+torch grad $w | torch value
+torch zero_grad $w
+d=$(torch detach $w)
+```
+
+Rules match PyTorch where possible:
+
+- `backward` needs a scalar loss on a tensor that requires gradients.
+- `grad` before any backward is an error.
+- Gradients accumulate until you zero them.
+- Re-run the forward computation before each backward pass; a second backward
+  through the same graph errors, as in PyTorch.
+
+Freeing an intermediate handle does not break backward, because the graph keeps
+the tensors it needs internally. Keep leaf handles, because they are how you
+read gradients.
+
+## Nushell
+
+Homebrew installs a Nushell autoload file, so new brew-built Nushell sessions
+get `nutorch` commands without a manual `use` line.
+
+```nu
+let t = ([[1 2] [3 4]] | nutorch tensor)
+$t | nutorch mm $t | nutorch value
+nutorch tensors | where bytes > 1_000_000 | get handle | each {|h| nutorch free $h }
+```
+
+A current generated module is also committed at `nutorch.nu`. Regenerate it
+with:
+
+```bash
+torch nu-module | save -f nutorch.nu
+```
+
+The wrappers preserve Nushell-native values, including NaN and infinity values.
+The same structured data is available to any shell through JSON flags such as
+`torch tensors --json`, `torch ops --json`, `torch nn info $m --json`, and
+`torch daemon status --json`.
+
+See `scripts/train-regression.nu` for a complete Nushell training loop.
+
+## Saving Tensors and Reclaiming Memory
+
+Export tensors you want to keep, then re-import them later:
+
+```bash
+torch value --meta $w > w.json
+w=$(torch tensor "$(cat w.json)")
+```
+
+`--meta` includes dtype metadata so round-trips preserve dtype.
+
+List and free registry handles:
+
+```bash
+torch tensors
+torch free $t1 $t2
+torch free --all
+torch daemon restart
+```
+
+JSON has no native NaN or infinity values, so `torch value` writes the tokens
+`"NaN"`, `"Infinity"`, and `"-Infinity"` for non-finite values. `torch tensor`
+reads those tokens back.
 
 ## Copyright
 
