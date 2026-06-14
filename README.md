@@ -191,22 +191,6 @@ bash. The architecture is being worked out in the open — see the issue tracker
 at [issues/README.md](issues/README.md) and the agent contract / vision in
 [AGENTS.md](AGENTS.md).
 
-## v1: the proof of concept
-
-Nutorch began as a Nushell plugin — 40 PyTorch operations, GPU acceleration
-(CPU/CUDA/MPS), autograd, and neural-network training, all from the Nushell
-command line. It proved the core idea that carries v2: tensors stay in a
-Rust-owned registry, and the shell passes string handles through pipelines.
-
-v1 is archived, frozen, and fully working in [`v1/`](v1/):
-
-- [v1/README.md](v1/README.md) — user documentation, installation, demos
-  (including screenshots in `v1/raw-images/`)
-- [v1/AGENTS.md](v1/AGENTS.md) — the v1 architecture record
-- [v1/TODO.md](v1/TODO.md) — v1 implementation status and quality tracking
-
-The original pre-archive layout is available at the git tag `v1-final`.
-
 ## Copyright
 
 Copyright (c) 2026 [Astrohacker](https://astrohacker.com) — MIT License (see
