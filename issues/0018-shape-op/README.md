@@ -1,6 +1,7 @@
 +++
-status = "open"
+status = "closed"
 opened = "2026-06-14"
+closed = "2026-06-14"
 +++
 
 # Issue 18: `shape` — a tensor's dimensions, on demand
@@ -100,3 +101,27 @@ mirroring gates. Out: any other v1 command (none remain), changing the
 intentionally-removed `devices` decision, and broadening `shape` into a
 size/stride/ndim metadata command (this op returns dims only, matching v1 and
 PyTorch `.shape`).
+
+## Conclusion
+
+**Solved in one experiment.** `shape` is restored as a bespoke data-returning op
+mirroring `value` at every layer: `torch shape <t>` / `$t | torch shape` and the
+`nutorch shape` wrapper return a tensor's dimensions as a JSON int list / native
+`list<int>`, with the dual input pattern, the 0-dim `[]` case, and three clean
+Rust-side error paths (unknown handle, malformed handle, wrong kind). The daemon
+handler is a four-line addition (`tensor.size()` → `Response::value`); the CLI
+and the generated Nushell module each gained the parallel wrapper; three unit
+tests and a dual-input parity entry guard it. All hygiene gates pass (fmt clean,
+no warnings, 82 lib tests green), and the design and result both cleared the
+adversarial review gate with the one design-stage finding (a mislabeled negative
+test) fixed.
+
+This closes the last gap from the v1→v2 audit: v2 now covers every operation v1
+implemented (save the intentionally-removed `devices`, per issue 0003) plus the
+~140 additional ops and the nn/optim subsystem.
+
+One out-of-scope follow-up surfaced and is **not** addressed here:
+`cargo test`'s `tests/golden.rs` `nn_linear_*` cases fail on a torch-2.11.0
+machine because the committed golden vectors were generated against a different
+toolchain — an environment mismatch unrelated to `shape` (confirmed failing on
+the clean tree). Regenerating the golden vectors is its own future issue.
