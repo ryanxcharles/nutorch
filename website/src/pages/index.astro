@@ -29,35 +29,35 @@ torch grad $w | torch value`;
 
 const features = [
   {
-    title: "GPU-only, by design",
+    title: "Apple-silicon GPU",
     body:
-      "Every tensor lives on the Apple-silicon GPU via Metal. There is no "
-      + "device option — that is the point of the library.",
+      "Nutorch runs tensors on Metal through LibTorch. There is no CPU mode "
+      + "and no device flag.",
   },
   {
-    title: "Any shell is first-class",
+    title: "Works in any shell",
     body:
-      "Handles are plain strings on stdout. Real POSIX pipelines compose in "
-      + "bash, zsh, and fish; Nushell gets a native structured-data module.",
+      "Handles are plain strings, so bash, zsh, fish, scripts, and pipelines "
+      + "all work naturally. Nushell gets structured commands too.",
   },
   {
-    title: "Autograd and neural nets",
+    title: "PyTorch-style API",
     body:
-      "Gradients flow through any pipeline. Modules, optimizers, training "
-      + "loops, and safetensors interchange with PyTorch — from the shell.",
+      "Operation names, arguments, defaults, broadcasting, autograd, modules, "
+      + "and optimizers follow PyTorch wherever possible.",
   },
   {
-    title: "PyTorch fidelity",
+    title: "Daemon-backed tensors",
     body:
-      "Command names, argument order, defaults, and broadcasting semantics "
-      + "match PyTorch wherever possible. 185 ops and counting.",
+      "A background daemon owns the tensors, GPU memory, and computation "
+      + "graph. Commands stay small; tensor data stays out of the shell.",
   },
 ];
 ---
 
 <Base
-  title="NuTorch — GPU tensors for every shell"
-  description="GPU tensors for every shell — PyTorch semantics on Apple-silicon Metal, piped through bash, zsh, fish, or Nushell."
+  title="NuTorch — GPU tensors from your shell"
+  description="Run PyTorch-style GPU tensor operations from bash, zsh, fish, or Nushell. Nutorch keeps tensors on Apple-silicon Metal and passes handles through shell pipelines."
 >
   <!-- Hero -->
   <section class="mx-auto max-w-5xl px-6 pt-16 pb-12 sm:pt-24">
@@ -77,11 +77,12 @@ const features = [
         <h1
           class="font-display text-4xl font-bold tracking-tight text-balance sm:text-5xl"
         >
-          GPU tensors for <span class="text-primary">every</span> shell
+          GPU tensors from <span class="text-primary">your</span> shell
         </h1>
         <p class="mt-4 text-lg text-muted">
-          Tensors live on your GPU. Your shell passes handles. Pipes do the
-          rest.
+          Run PyTorch-style tensor operations from bash, zsh, fish, or Nushell.
+          Nutorch keeps tensors on the Apple-silicon GPU and passes lightweight
+          handles through ordinary shell pipelines.
         </p>
         <div class="shell-tabs mt-6 text-left">
           <div class="shell-tablist" role="tablist" aria-label="Shell">
@@ -123,8 +124,7 @@ const features = [
           </div>
         </div>
         <p class="mt-3 text-sm text-muted">
-          PyTorch semantics on Apple-silicon Metal — from bash, zsh, fish, or
-          Nushell.
+          Powered by LibTorch on Metal. Requires an Apple-silicon Mac.
         </p>
         <div
           class="mt-6 flex flex-wrap items-center justify-center gap-4 sm:justify-start"
@@ -145,10 +145,11 @@ const features = [
   <!-- Install -->
   <section id="install" class="mx-auto max-w-5xl scroll-mt-8 px-6 py-12">
     <h2 class="font-display text-2xl font-bold tracking-tight">
-      Three commands
+      Installation
     </h2>
     <p class="mt-2 text-muted">
-      A prebuilt bottle pours in seconds — no Python, no Rust, no checkout.
+      Install with Homebrew. On supported Macs, Homebrew downloads a prebuilt
+      bottle.
     </p>
     <div class="relative mt-6">
       <CodeBlock code={install} lang="bash" />
@@ -164,10 +165,12 @@ const features = [
 
   <!-- Demos -->
   <section class="mx-auto max-w-5xl px-6 py-12">
-    <h2 class="font-display text-2xl font-bold tracking-tight">See it run</h2>
+    <h2 class="font-display text-2xl font-bold tracking-tight">
+      Shell-native tensors
+    </h2>
     <p class="mt-2 text-muted">
-      The daemon starts itself on the first command and owns the GPU; your
-      shell just passes handles around.
+      Each command sends one operation to the daemon. Results come back as
+      handles, so tensor operations compose naturally in pipelines.
     </p>
     <div class="mt-6 grid gap-6 lg:grid-cols-2">
       <div>
@@ -181,7 +184,7 @@ const features = [
     </div>
     <div class="mt-6">
       <h3 class="mb-3 font-mono text-sm font-medium text-muted">
-        autograd, in your terminal
+        Autograd
       </h3>
       <CodeBlock code={trainDemo} lang="bash" />
     </div>
