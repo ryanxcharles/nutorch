@@ -12,9 +12,9 @@ return to native Nushell values — no JSON wrangling.
 ## Setup
 
 **If you installed NuTorch with Homebrew, there is nothing to set up.** The
-formula ships a vendor-autoload stub, Nushell sources it at startup, and
-`nutorch` commands are simply there in every new session — no `use` line, no
-`config.nu` edit. (Mechanism: Nushell autoloads every `.nu` file in
+formula ships a vendor-autoload stub, Nushell sources it at startup, and `torch`
+commands are simply there in every new session — no `use` line, no `config.nu`
+edit. (Mechanism: Nushell autoloads every `.nu` file in
 `$nu.vendor-autoload-dirs`, and brew-built Nushell scans
 `$(brew --prefix)/share/nushell/vendor/autoload`.)
 
@@ -42,9 +42,9 @@ torch nu-module | save -f nutorch.nu
 ## Structured data in and out
 
 ```nu
-let t = ([[1 2] [3 4]] | nutorch tensor)
-$t | nutorch mm $t | nutorch value            # a native table
-nutorch tensors | where bytes > 1_000_000 | get handle | each {|h| nutorch free $h }
+let t = ([[1 2] [3 4]] | torch tensor)
+$t | torch mm $t | torch value            # a native table
+torch tensors | where bytes > 1_000_000 | get handle | each {|h| torch free $h }
 ```
 
 Wrappers honor the dual input pattern — pipe the leftmost tensor in as `$in`, or
@@ -54,6 +54,10 @@ Non-finite values cross the boundary as REAL Nushell NaN/infinity floats; the
 JSON dialect (`"NaN"`, `"Infinity"`, `"-Infinity"`) is handled for you in both
 directions.
 
+Use `^torch` when you explicitly want the external CLI's raw text or JSON output
+instead of the structured Nushell wrapper result. The old `nutorch <op>`
+namespace remains as a compatibility alias for existing scripts.
+
 ## Training, natively
 
 The regression from [neural networks](/docs/neural-networks/), as Nushell:
@@ -61,17 +65,17 @@ The regression from [neural networks](/docs/neural-networks/), as Nushell:
 ```nu
 use nutorch.nu *
 
-nutorch manual_seed 42 | ignore
-let x = ([[0.0] [1.0] [2.0] [3.0]] | nutorch tensor)
-let y = ([[1.0] [3.0] [5.0] [7.0]] | nutorch tensor)
-let model = (nutorch nn linear 1 1)
-let opt = (nutorch nn sgd $model --lr 0.05)
+torch manual_seed 42 | ignore
+let x = ([[0.0] [1.0] [2.0] [3.0]] | torch tensor)
+let y = ([[1.0] [3.0] [5.0] [7.0]] | torch tensor)
+let model = (torch nn linear 1 1)
+let opt = (torch nn sgd $model --lr 0.05)
 
 for i in 1..200 {
-  let loss = ($x | nutorch forward $model | nutorch mse_loss $y)
-  $loss | nutorch backward
-  $opt | nutorch step
-  nutorch nn zero_grad $opt | ignore
+  let loss = ($x | torch forward $model | torch mse_loss $y)
+  $loss | torch backward
+  $opt | torch step
+  torch nn zero_grad $opt | ignore
 }
 ```
 

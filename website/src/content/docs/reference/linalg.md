@@ -17,7 +17,7 @@ torch mm <t1> <t2>
 ```
 
 ```nu
-nutorch mm <t1> <t2>
+torch mm <t1> <t2>
 ```
 
 ### matmul
@@ -29,7 +29,7 @@ torch matmul <t1> <t2>
 ```
 
 ```nu
-nutorch matmul <t1> <t2>
+torch matmul <t1> <t2>
 ```
 
 ### bmm
@@ -41,7 +41,7 @@ torch bmm <t1> <t2>
 ```
 
 ```nu
-nutorch bmm <t1> <t2>
+torch bmm <t1> <t2>
 ```
 
 ### dot
@@ -53,7 +53,7 @@ torch dot <t1> <t2>
 ```
 
 ```nu
-nutorch dot <t1> <t2>
+torch dot <t1> <t2>
 ```
 
 ### outer
@@ -65,7 +65,7 @@ torch outer <t1> <t2>
 ```
 
 ```nu
-nutorch outer <t1> <t2>
+torch outer <t1> <t2>
 ```
 
 ### einsum
@@ -77,7 +77,7 @@ torch einsum <t1>... (at least 1) [--equation <Str>]
 ```
 
 ```nu
-nutorch einsum <t1>... (at least 1) [--equation <Str>]
+torch einsum <t1>... (at least 1) [--equation <Str>]
 ```
 
 ### tril
@@ -89,7 +89,7 @@ torch tril <t1> [--diagonal <Int>]
 ```
 
 ```nu
-nutorch tril <t1> [--diagonal <Int>]
+torch tril <t1> [--diagonal <Int>]
 ```
 
 ### triu
@@ -101,7 +101,7 @@ torch triu <t1> [--diagonal <Int>]
 ```
 
 ```nu
-nutorch triu <t1> [--diagonal <Int>]
+torch triu <t1> [--diagonal <Int>]
 ```
 
 ### diag
@@ -113,7 +113,7 @@ torch diag <t1> [--diagonal <Int>]
 ```
 
 ```nu
-nutorch diag <t1> [--diagonal <Int>]
+torch diag <t1> [--diagonal <Int>]
 ```
 
 ### trace
@@ -125,7 +125,7 @@ torch trace <t1>
 ```
 
 ```nu
-nutorch trace <t1>
+torch trace <t1>
 ```
 
 ### det
@@ -137,7 +137,7 @@ torch det <t1>
 ```
 
 ```nu
-nutorch det <t1>
+torch det <t1>
 ```
 
 ### inverse
@@ -149,7 +149,7 @@ torch inverse <t1>
 ```
 
 ```nu
-nutorch inverse <t1>
+torch inverse <t1>
 ```
 
 ### svd
@@ -161,7 +161,7 @@ torch svd <t1>
 ```
 
 ```nu
-nutorch svd <t1>
+torch svd <t1>
 ```
 
 ### solve
@@ -173,7 +173,7 @@ torch solve <t1> <t2>
 ```
 
 ```nu
-nutorch solve <t1> <t2>
+torch solve <t1> <t2>
 ```
 
 ### cross
@@ -185,7 +185,7 @@ torch cross <t1> <t2> [--dim <Int>]
 ```
 
 ```nu
-nutorch cross <t1> <t2> [--dim <Int>]
+torch cross <t1> <t2> [--dim <Int>]
 ```
 
 ### kron
@@ -197,7 +197,7 @@ torch kron <t1> <t2>
 ```
 
 ```nu
-nutorch kron <t1> <t2>
+torch kron <t1> <t2>
 ```
 
 ### tensordot
@@ -209,5 +209,5 @@ torch tensordot <t1> <t2> [--dims <Int>]
 ```
 
 ```nu
-nutorch tensordot <t1> <t2> [--dims <Int>]
+torch tensordot <t1> <t2> [--dims <Int>]
 ```

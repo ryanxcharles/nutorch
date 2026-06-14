@@ -123,3 +123,92 @@ only a handful of verbs and could miss examples such as `nutorch randn`,
 emit the last result; it now constructs one output value containing both command
 types. **Second pass: APPROVED** — the reviewer confirmed all three prior
 Required findings are resolved and no new Required finding was introduced.
+
+## Result
+
+**Result:** Partial
+
+The Nushell command rename itself is implemented and verified:
+
+- `torch-cli/src/main.rs` now generates `torch <op>` wrappers as the primary
+  Nushell namespace.
+- `nutorch.nu` is regenerated from `torch nu-module`; it contains primary
+  `torch` wrappers plus `nutorch` compatibility aliases for the prelude verbs
+  and all 185 table ops.
+- `scripts/test-dual-input.nu`, `scripts/train-regression.nu`, README examples,
+  website docs, the landing page snippets, and generated reference pages now
+  teach `torch` for Nushell commands.
+- The docs explain `^torch` as the explicit escape hatch for raw external CLI
+  output.
+- The installed package names, formula/tap, `nutorch.nu` filename, daemon,
+  protocol, and POSIX CLI behavior are unchanged.
+
+Direct verification passed:
+
+- `cargo fmt`
+- `cargo fmt -- --check`
+- `cargo check` with no new warnings
+- `cargo build`
+- `cargo test -p torch-cli` (includes the `nutorch.nu` staleness test)
+- `PATH="$PWD/target/debug:$PATH" nu -c 'use ./nutorch.nu *; [(which "torch tensor" | get 0.type) (which "nutorch tensor" | get 0.type)] | to nuon'`
+  → `[custom, alias]`
+- Live structured wrapper smoke: `[[1 2] [3 4]] | torch tensor | torch value`
+  returned native Nu data `[[1.0, 2.0], [3.0, 4.0]]`
+- Live escape-hatch smoke: `^torch value <handle>` returned raw CLI JSON
+  `[[1.0,2.0],[3.0,4.0]]`
+- Live compatibility smoke: `nutorch tensor [1 2] | nutorch value` returned
+  `[1.0, 2.0]`
+- `PATH="$PWD/target/debug:$PATH" nu scripts/test-dual-input.nu` passed,
+  including the new `nutorch` alias compatibility assertion.
+- `dprint check`
+- `git diff --check`
+- From `website/`:
+  - `PATH="/Users/astrohacker/dev/nutorch/target/debug:$PATH" bun run check:ops-ref`
+  - `PATH="/Users/astrohacker/dev/nutorch/target/debug:$PATH" bun run check:content`
+  - `bun run check:mirror`
+- `rg -n '\bnutorch [a-z][a-z0-9_-]*' README.md website/src/content scripts`
+  reports only the explicit compatibility assertion in
+  `scripts/test-dual-input.nu`.
+
+Required verification did not fully pass:
+
+- `cargo test` fails in the unchanged `nutorchd/tests/golden.rs` suite, in four
+  `nn_linear_*` golden cases (`nn_linear_bias`, `nn_linear_relu`,
+  `nn_linear_gelu`, `nn_linear_sigmoid`). The implementation diff for this
+  experiment does not touch `nutorchd/`, `ops/`, `Cargo.toml`, or `Cargo.lock`;
+  the zsh training twin fails with the same convergence numbers as the Nu
+  script, so this is not caused by the namespace rename.
+- `PATH="$PWD/target/debug:$PATH" nu scripts/train-regression.nu` fails with the
+  same training convergence problem as `scripts/train-regression.sh`
+  (`final loss 0.3571428656578064 >= 1e-3`).
+- `bun run check:tabs` cannot start Chrome in this environment:
+  `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome` is missing, and
+  no Chrome/Chromium binary was found in `/Applications` or PATH.
+
+## Conclusion
+
+The issue-20 behavior is in place: Nushell users can use `torch` as the command
+namespace, `nutorch` remains a compatibility alias, and docs now teach the new
+surface. The experiment cannot honestly close as Pass until the required
+verification gates are either made green or explicitly re-scoped around the
+pre-existing/current NN golden failure and the missing browser dependency for
+`check:tabs`.
+
+## Result Review
+
+**Reviewer:** Codex fresh-context subagent (`multi_agent_v1`, nickname
+`Lorentz`). **Verdict: APPROVED — no findings.** The reviewer confirmed the
+result commit had not been made, no daemon/protocol/ops/formula/install files
+were changed, `torch <op>` wrappers are primary, `nutorch <op>` aliases exist,
+`target/debug/torch nu-module | diff -u - nutorch.nu` is clean, and live Nu
+smokes prove structured wrapper output, raw `^torch` output, and compatibility
+alias behavior. The reviewer re-ran and passed `cargo fmt -- --check`,
+`cargo check`, `cargo test -p torch-cli`, `dprint check`,
+`scripts/test-dual-input.nu`, `check:ops-ref`, `check:content`, and
+`check:mirror`; they also reproduced the recorded failures: full `cargo test`
+fails only on the four unchanged `nn_linear_*` golden cases, both Nu and zsh
+regression training fail with final loss `0.3571428656578064`, and `check:tabs`
+fails because Chrome is missing. **Scoped re-review: APPROVED** — after a
+post-review comment cleanup in `scripts/gen-golden.py`, a second fresh-context
+reviewer confirmed the broad command scan still reports only the expected
+compatibility assertion and the cleanup introduces no new Required finding.

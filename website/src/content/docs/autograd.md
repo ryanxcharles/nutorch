@@ -19,12 +19,12 @@ d=$(torch detach $w)            # graph-free reference (stops tracking)
 ```
 
 ```nu
-let w = (nutorch randn [3] --requires_grad)
-let loss = (nutorch mul $w $w | nutorch sum)
-nutorch backward $loss                     # gradients ACCUMULATE across calls
-print (nutorch grad $w | nutorch value)    # a snapshot
-nutorch zero_grad $w                       # reset; grad now reads as zeros
-let d = (nutorch detach $w)                # graph-free (stops tracking)
+let w = (torch randn [3] --requires_grad)
+let loss = (torch mul $w $w | torch sum)
+torch backward $loss                     # gradients ACCUMULATE across calls
+print (torch grad $w | torch value)    # a snapshot
+torch zero_grad $w                       # reset; grad now reads as zeros
+let d = (torch detach $w)                # graph-free (stops tracking)
 ```
 
 ## Rules of the road
@@ -54,7 +54,7 @@ torch mse_loss $pred $target | torch backward
 ```
 
 ```nu
-nutorch mse_loss $pred $target | nutorch backward
+torch mse_loss $pred $target | torch backward
 ```
 
 `cross_entropy`, `l1_loss`, `binary_cross_entropy_with_logits`, and friends are

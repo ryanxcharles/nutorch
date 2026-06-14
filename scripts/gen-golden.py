@@ -106,7 +106,7 @@ ok("sum_dim0", "sum", [t([[1, 2], [3, 4]])], {"dim": 0},
 ok("sum_dim1_keepdim", "sum", [t([[1, 2], [3, 4]])], {"dim": 1, "keepdim": True},
    lambda ts: [ts[0].sum(dim=1, keepdim=True)])
 ok("mean_float", "mean", [t([1, 2, 3, 4])], {}, lambda ts: [ts[0].mean()])
-# Documented deviation: nutorch mean reduces ints in float32 (v1 fidelity).
+# Documented deviation: NuTorch mean reduces ints in float32.
 ok("mean_int_input_is_float32", "mean", [t([1, 2, 3, 4], "int64")], {},
    lambda ts: [ts[0].float().mean()])
 

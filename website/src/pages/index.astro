@@ -8,9 +8,9 @@ b=$(torch tensor '[4,5,6]')
 torch add $a $b | torch value
 # [5.0,7.0,9.0]   computed on the GPU`;
 
-const heroDemoNu = `let a = (nutorch tensor [1 2 3])
-let b = (nutorch tensor [4 5 6])
-nutorch add $a $b | nutorch value
+const heroDemoNu = `let a = (torch tensor [1 2 3])
+let b = (torch tensor [4 5 6])
+torch add $a $b | torch value
 # [5.0, 7.0, 9.0] — a native list, on the GPU`;
 
 const bashDemo = `m=$(torch randn '[3,3]')
@@ -18,8 +18,8 @@ torch mm $m $m | torch mean | torch value
 # matrix product, then mean — one pipeline`;
 
 const nuDemo = `use nutorch.nu *
-let t = ([[1 2] [3 4]] | nutorch tensor)
-$t | nutorch mm $t | nutorch value
+let t = ([[1 2] [3 4]] | torch tensor)
+$t | torch mm $t | torch value
 # native table out`;
 
 const trainDemo = `w=$(torch randn '[3]' --requires_grad)

@@ -90,4 +90,5 @@ Out:
 ## Experiments
 
 - [Experiment 1: Rename the Nushell namespace](01-rename-nushell-namespace.md) —
-  **Designed**
+  **Partial** (rename works; full verification blocked by unchanged NN golden
+  failures and missing Chrome for `check:tabs`)

@@ -47,7 +47,7 @@ The formula source lives at `dist/nutorch.rb`; the published tap is
 git clone https://github.com/nutorch/nutorch
 cd nutorch
 scripts/bootstrap.sh     # venv + torch 2.11.0 + release build
-scripts/install.sh       # installs to ~/.nutorch by default
+scripts/install.sh       # installs to ~/.nutorch/ by default
 torch --version
 ```
 
@@ -93,8 +93,8 @@ echo $a | torch add $b    # pipeline form: stdin fills the leftmost tensor slot
 Nushell wrappers follow the same pattern:
 
 ```nu
-nutorch add $a $b
-$a | nutorch add $b
+torch add $a $b
+$a | torch add $b
 ```
 
 ## Neural Networks
@@ -176,12 +176,12 @@ read gradients.
 ## Nushell
 
 Homebrew installs a Nushell autoload file, so new brew-built Nushell sessions
-get `nutorch` commands without a manual `use` line.
+get `torch` commands without a manual `use` line.
 
 ```nu
-let t = ([[1 2] [3 4]] | nutorch tensor)
-$t | nutorch mm $t | nutorch value
-nutorch tensors | where bytes > 1_000_000 | get handle | each {|h| nutorch free $h }
+let t = ([[1 2] [3 4]] | torch tensor)
+$t | torch mm $t | torch value
+torch tensors | where bytes > 1_000_000 | get handle | each {|h| torch free $h }
 ```
 
 A current generated module is also committed at `nutorch.nu`. Regenerate it
@@ -192,7 +192,9 @@ torch nu-module | save -f nutorch.nu
 ```
 
 The wrappers preserve Nushell-native values, including NaN and infinity values.
-The same structured data is available to any shell through JSON flags such as
+Inside Nushell, use `^torch` when you explicitly want the external CLI's raw
+text/JSON output instead of the structured wrapper result. The same structured
+data is available to any shell through JSON flags such as
 `torch tensors --json`, `torch ops --json`, `torch nn info $m --json`, and
 `torch daemon status --json`.
 

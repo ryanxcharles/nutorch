@@ -17,5 +17,5 @@ torch manual_seed <seed>
 ```
 
 ```nu
-nutorch manual_seed <seed>
+torch manual_seed <seed>
 ```

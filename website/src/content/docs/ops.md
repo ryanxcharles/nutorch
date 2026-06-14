@@ -19,7 +19,7 @@ torch add $a $b --alpha 2
 ```
 
 ```nu
-nutorch add $a $b --alpha 2
+torch add $a $b --alpha 2
 ```
 
 Broadcasting follows PyTorch's rules. Non-broadcastable shapes error with both
@@ -35,8 +35,8 @@ torch mean --help        # usage, parameters, defaults for any op
 ```
 
 ```nu
-nutorch ops                             # every op: a native table
-nutorch ops | where category == "loss"  # filter natively — no JSON needed
+torch ops                             # every op: a native table
+torch ops | where category == "loss"  # filter natively — no JSON needed
 torch mean --help                       # usage, parameters, defaults for any op
 ```
 

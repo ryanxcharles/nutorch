@@ -34,12 +34,12 @@ torch daemon start       # start without running an op
 ```
 
 ```nu
-nutorch daemon status    # pid, ttl, idle time, time remaining,
+torch daemon status    # pid, ttl, idle time, time remaining,
                          # tensor count, memory held, socket, log
-nutorch daemon ttl 4h    # change the idle TTL on the live daemon (none = forever)
-nutorch daemon stop      # shut down now
-nutorch daemon restart   # fresh daemon, empty registry
-nutorch daemon start     # start without running an op
+torch daemon ttl 4h    # change the idle TTL on the live daemon (none = forever)
+torch daemon stop      # shut down now
+torch daemon restart   # fresh daemon, empty registry
+torch daemon start     # start without running an op
 ```
 
 `torch daemon status --json` emits the same record as JSON for scripts.

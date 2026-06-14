@@ -17,7 +17,7 @@ torch add <t1> <t2> [--alpha <Scalar>]
 ```
 
 ```nu
-nutorch add <t1> <t2> [--alpha <Scalar>]
+torch add <t1> <t2> [--alpha <Scalar>]
 ```
 
 ### sub
@@ -29,7 +29,7 @@ torch sub <t1> <t2> [--alpha <Scalar>]
 ```
 
 ```nu
-nutorch sub <t1> <t2> [--alpha <Scalar>]
+torch sub <t1> <t2> [--alpha <Scalar>]
 ```
 
 ### sin
@@ -41,7 +41,7 @@ torch sin <t1>
 ```
 
 ```nu
-nutorch sin <t1>
+torch sin <t1>
 ```
 
 ### pow
@@ -53,7 +53,7 @@ torch pow <t1> <exponent>
 ```
 
 ```nu
-nutorch pow <t1> <exponent>
+torch pow <t1> <exponent>
 ```
 
 ### clamp
@@ -65,7 +65,7 @@ torch clamp <t1> [--min <HandleOrScalar>] [--max <HandleOrScalar>]
 ```
 
 ```nu
-nutorch clamp <t1> [--min <HandleOrScalar>] [--max <HandleOrScalar>]
+torch clamp <t1> [--min <HandleOrScalar>] [--max <HandleOrScalar>]
 ```
 
 ### abs
@@ -77,7 +77,7 @@ torch abs <t1>
 ```
 
 ```nu
-nutorch abs <t1>
+torch abs <t1>
 ```
 
 ### acos
@@ -89,7 +89,7 @@ torch acos <t1>
 ```
 
 ```nu
-nutorch acos <t1>
+torch acos <t1>
 ```
 
 ### acosh
@@ -101,7 +101,7 @@ torch acosh <t1>
 ```
 
 ```nu
-nutorch acosh <t1>
+torch acosh <t1>
 ```
 
 ### asin
@@ -113,7 +113,7 @@ torch asin <t1>
 ```
 
 ```nu
-nutorch asin <t1>
+torch asin <t1>
 ```
 
 ### asinh
@@ -125,7 +125,7 @@ torch asinh <t1>
 ```
 
 ```nu
-nutorch asinh <t1>
+torch asinh <t1>
 ```
 
 ### atan
@@ -137,7 +137,7 @@ torch atan <t1>
 ```
 
 ```nu
-nutorch atan <t1>
+torch atan <t1>
 ```
 
 ### atanh
@@ -149,7 +149,7 @@ torch atanh <t1>
 ```
 
 ```nu
-nutorch atanh <t1>
+torch atanh <t1>
 ```
 
 ### ceil
@@ -161,7 +161,7 @@ torch ceil <t1>
 ```
 
 ```nu
-nutorch ceil <t1>
+torch ceil <t1>
 ```
 
 ### cos
@@ -173,7 +173,7 @@ torch cos <t1>
 ```
 
 ```nu
-nutorch cos <t1>
+torch cos <t1>
 ```
 
 ### cosh
@@ -185,7 +185,7 @@ torch cosh <t1>
 ```
 
 ```nu
-nutorch cosh <t1>
+torch cosh <t1>
 ```
 
 ### deg2rad
@@ -197,7 +197,7 @@ torch deg2rad <t1>
 ```
 
 ```nu
-nutorch deg2rad <t1>
+torch deg2rad <t1>
 ```
 
 ### digamma
@@ -209,7 +209,7 @@ torch digamma <t1>
 ```
 
 ```nu
-nutorch digamma <t1>
+torch digamma <t1>
 ```
 
 ### erf
@@ -221,7 +221,7 @@ torch erf <t1>
 ```
 
 ```nu
-nutorch erf <t1>
+torch erf <t1>
 ```
 
 ### erfc
@@ -233,7 +233,7 @@ torch erfc <t1>
 ```
 
 ```nu
-nutorch erfc <t1>
+torch erfc <t1>
 ```
 
 ### exp
@@ -245,7 +245,7 @@ torch exp <t1>
 ```
 
 ```nu
-nutorch exp <t1>
+torch exp <t1>
 ```
 
 ### exp2
@@ -257,7 +257,7 @@ torch exp2 <t1>
 ```
 
 ```nu
-nutorch exp2 <t1>
+torch exp2 <t1>
 ```
 
 ### expm1
@@ -269,7 +269,7 @@ torch expm1 <t1>
 ```
 
 ```nu
-nutorch expm1 <t1>
+torch expm1 <t1>
 ```
 
 ### floor
@@ -281,7 +281,7 @@ torch floor <t1>
 ```
 
 ```nu
-nutorch floor <t1>
+torch floor <t1>
 ```
 
 ### frac
@@ -293,7 +293,7 @@ torch frac <t1>
 ```
 
 ```nu
-nutorch frac <t1>
+torch frac <t1>
 ```
 
 ### i0
@@ -305,7 +305,7 @@ torch i0 <t1>
 ```
 
 ```nu
-nutorch i0 <t1>
+torch i0 <t1>
 ```
 
 ### lgamma
@@ -317,7 +317,7 @@ torch lgamma <t1>
 ```
 
 ```nu
-nutorch lgamma <t1>
+torch lgamma <t1>
 ```
 
 ### log
@@ -329,7 +329,7 @@ torch log <t1>
 ```
 
 ```nu
-nutorch log <t1>
+torch log <t1>
 ```
 
 ### log10
@@ -341,7 +341,7 @@ torch log10 <t1>
 ```
 
 ```nu
-nutorch log10 <t1>
+torch log10 <t1>
 ```
 
 ### log1p
@@ -353,7 +353,7 @@ torch log1p <t1>
 ```
 
 ```nu
-nutorch log1p <t1>
+torch log1p <t1>
 ```
 
 ### log2
@@ -365,7 +365,7 @@ torch log2 <t1>
 ```
 
 ```nu
-nutorch log2 <t1>
+torch log2 <t1>
 ```
 
 ### logit
@@ -377,7 +377,7 @@ torch logit <t1>
 ```
 
 ```nu
-nutorch logit <t1>
+torch logit <t1>
 ```
 
 ### neg
@@ -389,7 +389,7 @@ torch neg <t1>
 ```
 
 ```nu
-nutorch neg <t1>
+torch neg <t1>
 ```
 
 ### rad2deg
@@ -401,7 +401,7 @@ torch rad2deg <t1>
 ```
 
 ```nu
-nutorch rad2deg <t1>
+torch rad2deg <t1>
 ```
 
 ### reciprocal
@@ -413,7 +413,7 @@ torch reciprocal <t1>
 ```
 
 ```nu
-nutorch reciprocal <t1>
+torch reciprocal <t1>
 ```
 
 ### relu
@@ -425,7 +425,7 @@ torch relu <t1>
 ```
 
 ```nu
-nutorch relu <t1>
+torch relu <t1>
 ```
 
 ### round
@@ -437,7 +437,7 @@ torch round <t1>
 ```
 
 ```nu
-nutorch round <t1>
+torch round <t1>
 ```
 
 ### rsqrt
@@ -449,7 +449,7 @@ torch rsqrt <t1>
 ```
 
 ```nu
-nutorch rsqrt <t1>
+torch rsqrt <t1>
 ```
 
 ### sgn
@@ -461,7 +461,7 @@ torch sgn <t1>
 ```
 
 ```nu
-nutorch sgn <t1>
+torch sgn <t1>
 ```
 
 ### sigmoid
@@ -473,7 +473,7 @@ torch sigmoid <t1>
 ```
 
 ```nu
-nutorch sigmoid <t1>
+torch sigmoid <t1>
 ```
 
 ### sign
@@ -485,7 +485,7 @@ torch sign <t1>
 ```
 
 ```nu
-nutorch sign <t1>
+torch sign <t1>
 ```
 
 ### sinc
@@ -497,7 +497,7 @@ torch sinc <t1>
 ```
 
 ```nu
-nutorch sinc <t1>
+torch sinc <t1>
 ```
 
 ### sinh
@@ -509,7 +509,7 @@ torch sinh <t1>
 ```
 
 ```nu
-nutorch sinh <t1>
+torch sinh <t1>
 ```
 
 ### sqrt
@@ -521,7 +521,7 @@ torch sqrt <t1>
 ```
 
 ```nu
-nutorch sqrt <t1>
+torch sqrt <t1>
 ```
 
 ### square
@@ -533,7 +533,7 @@ torch square <t1>
 ```
 
 ```nu
-nutorch square <t1>
+torch square <t1>
 ```
 
 ### tan
@@ -545,7 +545,7 @@ torch tan <t1>
 ```
 
 ```nu
-nutorch tan <t1>
+torch tan <t1>
 ```
 
 ### tanh
@@ -557,7 +557,7 @@ torch tanh <t1>
 ```
 
 ```nu
-nutorch tanh <t1>
+torch tanh <t1>
 ```
 
 ### trunc
@@ -569,7 +569,7 @@ torch trunc <t1>
 ```
 
 ```nu
-nutorch trunc <t1>
+torch trunc <t1>
 ```
 
 ### softmax
@@ -581,7 +581,7 @@ torch softmax <t1> [--dim <Int>]
 ```
 
 ```nu
-nutorch softmax <t1> [--dim <Int>]
+torch softmax <t1> [--dim <Int>]
 ```
 
 ### log_softmax
@@ -593,7 +593,7 @@ torch log_softmax <t1> [--dim <Int>]
 ```
 
 ```nu
-nutorch log_softmax <t1> [--dim <Int>]
+torch log_softmax <t1> [--dim <Int>]
 ```
 
 ### nan_to_num
@@ -605,7 +605,7 @@ torch nan_to_num <t1> [--nan <Float>] [--posinf <Float>] [--neginf <Float>]
 ```
 
 ```nu
-nutorch nan_to_num <t1> [--nan <Float>] [--posinf <Float>] [--neginf <Float>]
+torch nan_to_num <t1> [--nan <Float>] [--posinf <Float>] [--neginf <Float>]
 ```
 
 ### mul
@@ -617,7 +617,7 @@ torch mul <t1> <t2>
 ```
 
 ```nu
-nutorch mul <t1> <t2>
+torch mul <t1> <t2>
 ```
 
 ### div
@@ -629,7 +629,7 @@ torch div <t1> <t2>
 ```
 
 ```nu
-nutorch div <t1> <t2>
+torch div <t1> <t2>
 ```
 
 ### maximum
@@ -641,7 +641,7 @@ torch maximum <t1> <t2>
 ```
 
 ```nu
-nutorch maximum <t1> <t2>
+torch maximum <t1> <t2>
 ```
 
 ### minimum
@@ -653,7 +653,7 @@ torch minimum <t1> <t2>
 ```
 
 ```nu
-nutorch minimum <t1> <t2>
+torch minimum <t1> <t2>
 ```
 
 ### atan2
@@ -665,7 +665,7 @@ torch atan2 <t1> <t2>
 ```
 
 ```nu
-nutorch atan2 <t1> <t2>
+torch atan2 <t1> <t2>
 ```
 
 ### fmod
@@ -677,7 +677,7 @@ torch fmod <t1> <t2>
 ```
 
 ```nu
-nutorch fmod <t1> <t2>
+torch fmod <t1> <t2>
 ```
 
 ### remainder
@@ -689,7 +689,7 @@ torch remainder <t1> <t2>
 ```
 
 ```nu
-nutorch remainder <t1> <t2>
+torch remainder <t1> <t2>
 ```
 
 ### floor_divide
@@ -701,7 +701,7 @@ torch floor_divide <t1> <t2>
 ```
 
 ```nu
-nutorch floor_divide <t1> <t2>
+torch floor_divide <t1> <t2>
 ```
 
 ### hypot
@@ -713,7 +713,7 @@ torch hypot <t1> <t2>
 ```
 
 ```nu
-nutorch hypot <t1> <t2>
+torch hypot <t1> <t2>
 ```
 
 ### copysign
@@ -725,7 +725,7 @@ torch copysign <t1> <t2>
 ```
 
 ```nu
-nutorch copysign <t1> <t2>
+torch copysign <t1> <t2>
 ```
 
 ### xlogy
@@ -737,7 +737,7 @@ torch xlogy <t1> <t2>
 ```
 
 ```nu
-nutorch xlogy <t1> <t2>
+torch xlogy <t1> <t2>
 ```
 
 ### logaddexp
@@ -749,7 +749,7 @@ torch logaddexp <t1> <t2>
 ```
 
 ```nu
-nutorch logaddexp <t1> <t2>
+torch logaddexp <t1> <t2>
 ```
 
 ### lerp
@@ -761,7 +761,7 @@ torch lerp <t1> <t2> <weight>
 ```
 
 ```nu
-nutorch lerp <t1> <t2> <weight>
+torch lerp <t1> <t2> <weight>
 ```
 
 ### addcmul
@@ -773,7 +773,7 @@ torch addcmul <t1> <t2> <t3> [--value <Scalar>]
 ```
 
 ```nu
-nutorch addcmul <t1> <t2> <t3> [--value <Scalar>]
+torch addcmul <t1> <t2> <t3> [--value <Scalar>]
 ```
 
 ### addcdiv
@@ -785,7 +785,7 @@ torch addcdiv <t1> <t2> <t3> [--value <Scalar>]
 ```
 
 ```nu
-nutorch addcdiv <t1> <t2> <t3> [--value <Scalar>]
+torch addcdiv <t1> <t2> <t3> [--value <Scalar>]
 ```
 
 ### bitwise_and
@@ -797,7 +797,7 @@ torch bitwise_and <t1> <t2>
 ```
 
 ```nu
-nutorch bitwise_and <t1> <t2>
+torch bitwise_and <t1> <t2>
 ```
 
 ### bitwise_or
@@ -809,7 +809,7 @@ torch bitwise_or <t1> <t2>
 ```
 
 ```nu
-nutorch bitwise_or <t1> <t2>
+torch bitwise_or <t1> <t2>
 ```
 
 ### bitwise_xor
@@ -821,7 +821,7 @@ torch bitwise_xor <t1> <t2>
 ```
 
 ```nu
-nutorch bitwise_xor <t1> <t2>
+torch bitwise_xor <t1> <t2>
 ```
 
 ### bitwise_not
@@ -833,7 +833,7 @@ torch bitwise_not <t1>
 ```
 
 ```nu
-nutorch bitwise_not <t1>
+torch bitwise_not <t1>
 ```
 
 ### bitwise_left_shift
@@ -845,7 +845,7 @@ torch bitwise_left_shift <t1> <t2>
 ```
 
 ```nu
-nutorch bitwise_left_shift <t1> <t2>
+torch bitwise_left_shift <t1> <t2>
 ```
 
 ### bitwise_right_shift
@@ -857,5 +857,5 @@ torch bitwise_right_shift <t1> <t2>
 ```
 
 ```nu
-nutorch bitwise_right_shift <t1> <t2>
+torch bitwise_right_shift <t1> <t2>
 ```

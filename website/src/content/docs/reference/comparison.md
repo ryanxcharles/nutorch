@@ -17,7 +17,7 @@ torch eq <t1> <t2>
 ```
 
 ```nu
-nutorch eq <t1> <t2>
+torch eq <t1> <t2>
 ```
 
 ### allclose
@@ -29,7 +29,7 @@ torch allclose <t1> <t2> [--rtol <Float>] [--atol <Float>]
 ```
 
 ```nu
-nutorch allclose <t1> <t2> [--rtol <Float>] [--atol <Float>]
+torch allclose <t1> <t2> [--rtol <Float>] [--atol <Float>]
 ```
 
 ### sort
@@ -41,7 +41,7 @@ torch sort <t1> [--dim <Int>] [--descending]
 ```
 
 ```nu
-nutorch sort <t1> [--dim <Int>] [--descending]
+torch sort <t1> [--dim <Int>] [--descending]
 ```
 
 ### gt
@@ -53,7 +53,7 @@ torch gt <t1> <t2>
 ```
 
 ```nu
-nutorch gt <t1> <t2>
+torch gt <t1> <t2>
 ```
 
 ### lt
@@ -65,7 +65,7 @@ torch lt <t1> <t2>
 ```
 
 ```nu
-nutorch lt <t1> <t2>
+torch lt <t1> <t2>
 ```
 
 ### ge
@@ -77,7 +77,7 @@ torch ge <t1> <t2>
 ```
 
 ```nu
-nutorch ge <t1> <t2>
+torch ge <t1> <t2>
 ```
 
 ### le
@@ -89,7 +89,7 @@ torch le <t1> <t2>
 ```
 
 ```nu
-nutorch le <t1> <t2>
+torch le <t1> <t2>
 ```
 
 ### ne
@@ -101,7 +101,7 @@ torch ne <t1> <t2>
 ```
 
 ```nu
-nutorch ne <t1> <t2>
+torch ne <t1> <t2>
 ```
 
 ### logical_and
@@ -113,7 +113,7 @@ torch logical_and <t1> <t2>
 ```
 
 ```nu
-nutorch logical_and <t1> <t2>
+torch logical_and <t1> <t2>
 ```
 
 ### logical_or
@@ -125,7 +125,7 @@ torch logical_or <t1> <t2>
 ```
 
 ```nu
-nutorch logical_or <t1> <t2>
+torch logical_or <t1> <t2>
 ```
 
 ### logical_xor
@@ -137,7 +137,7 @@ torch logical_xor <t1> <t2>
 ```
 
 ```nu
-nutorch logical_xor <t1> <t2>
+torch logical_xor <t1> <t2>
 ```
 
 ### isclose
@@ -149,7 +149,7 @@ torch isclose <t1> <t2> [--rtol <Float>] [--atol <Float>]
 ```
 
 ```nu
-nutorch isclose <t1> <t2> [--rtol <Float>] [--atol <Float>]
+torch isclose <t1> <t2> [--rtol <Float>] [--atol <Float>]
 ```
 
 ### isnan
@@ -161,7 +161,7 @@ torch isnan <t1>
 ```
 
 ```nu
-nutorch isnan <t1>
+torch isnan <t1>
 ```
 
 ### isinf
@@ -173,7 +173,7 @@ torch isinf <t1>
 ```
 
 ```nu
-nutorch isinf <t1>
+torch isinf <t1>
 ```
 
 ### isfinite
@@ -185,7 +185,7 @@ torch isfinite <t1>
 ```
 
 ```nu
-nutorch isfinite <t1>
+torch isfinite <t1>
 ```
 
 ### isposinf
@@ -197,7 +197,7 @@ torch isposinf <t1>
 ```
 
 ```nu
-nutorch isposinf <t1>
+torch isposinf <t1>
 ```
 
 ### isneginf
@@ -209,7 +209,7 @@ torch isneginf <t1>
 ```
 
 ```nu
-nutorch isneginf <t1>
+torch isneginf <t1>
 ```
 
 ### logical_not
@@ -221,7 +221,7 @@ torch logical_not <t1>
 ```
 
 ```nu
-nutorch logical_not <t1>
+torch logical_not <t1>
 ```
 
 ### equal
@@ -233,7 +233,7 @@ torch equal <t1> <t2>
 ```
 
 ```nu
-nutorch equal <t1> <t2>
+torch equal <t1> <t2>
 ```
 
 ### topk
@@ -245,7 +245,7 @@ torch topk <t1> <k> [--dim <Int>] [--smallest]
 ```
 
 ```nu
-nutorch topk <t1> <k> [--dim <Int>] [--smallest]
+torch topk <t1> <k> [--dim <Int>] [--smallest]
 ```
 
 ### argsort
@@ -257,7 +257,7 @@ torch argsort <t1> [--dim <Int>] [--descending]
 ```
 
 ```nu
-nutorch argsort <t1> [--dim <Int>] [--descending]
+torch argsort <t1> [--dim <Int>] [--descending]
 ```
 
 ### searchsorted
@@ -269,7 +269,7 @@ torch searchsorted <t1> <t2>
 ```
 
 ```nu
-nutorch searchsorted <t1> <t2>
+torch searchsorted <t1> <t2>
 ```
 
 ### bucketize
@@ -281,7 +281,7 @@ torch bucketize <t1> <t2>
 ```
 
 ```nu
-nutorch bucketize <t1> <t2>
+torch bucketize <t1> <t2>
 ```
 
 ### msort
@@ -293,7 +293,7 @@ torch msort <t1>
 ```
 
 ```nu
-nutorch msort <t1>
+torch msort <t1>
 ```
 
 ### unique
@@ -305,5 +305,5 @@ torch unique <t1>
 ```
 
 ```nu
-nutorch unique <t1>
+torch unique <t1>
 ```

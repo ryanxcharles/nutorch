@@ -17,7 +17,7 @@ torch mse_loss <t1> <t2> [--reduction <Str>]
 ```
 
 ```nu
-nutorch mse_loss <t1> <t2> [--reduction <Str>]
+torch mse_loss <t1> <t2> [--reduction <Str>]
 ```
 
 ### l1_loss
@@ -29,7 +29,7 @@ torch l1_loss <t1> <t2> [--reduction <Str>]
 ```
 
 ```nu
-nutorch l1_loss <t1> <t2> [--reduction <Str>]
+torch l1_loss <t1> <t2> [--reduction <Str>]
 ```
 
 ### smooth_l1_loss
@@ -41,7 +41,7 @@ torch smooth_l1_loss <t1> <t2> [--reduction <Str>] [--beta <Float>]
 ```
 
 ```nu
-nutorch smooth_l1_loss <t1> <t2> [--reduction <Str>] [--beta <Float>]
+torch smooth_l1_loss <t1> <t2> [--reduction <Str>] [--beta <Float>]
 ```
 
 ### huber_loss
@@ -53,7 +53,7 @@ torch huber_loss <t1> <t2> [--reduction <Str>] [--delta <Float>]
 ```
 
 ```nu
-nutorch huber_loss <t1> <t2> [--reduction <Str>] [--delta <Float>]
+torch huber_loss <t1> <t2> [--reduction <Str>] [--delta <Float>]
 ```
 
 ### cross_entropy
@@ -65,7 +65,7 @@ torch cross_entropy <t1> <t2> [--reduction <Str>]
 ```
 
 ```nu
-nutorch cross_entropy <t1> <t2> [--reduction <Str>]
+torch cross_entropy <t1> <t2> [--reduction <Str>]
 ```
 
 ### nll_loss
@@ -77,7 +77,7 @@ torch nll_loss <t1> <t2> [--reduction <Str>]
 ```
 
 ```nu
-nutorch nll_loss <t1> <t2> [--reduction <Str>]
+torch nll_loss <t1> <t2> [--reduction <Str>]
 ```
 
 ### binary_cross_entropy
@@ -89,7 +89,7 @@ torch binary_cross_entropy <t1> <t2> [--reduction <Str>]
 ```
 
 ```nu
-nutorch binary_cross_entropy <t1> <t2> [--reduction <Str>]
+torch binary_cross_entropy <t1> <t2> [--reduction <Str>]
 ```
 
 ### binary_cross_entropy_with_logits
@@ -101,7 +101,7 @@ torch binary_cross_entropy_with_logits <t1> <t2> [--reduction <Str>]
 ```
 
 ```nu
-nutorch binary_cross_entropy_with_logits <t1> <t2> [--reduction <Str>]
+torch binary_cross_entropy_with_logits <t1> <t2> [--reduction <Str>]
 ```
 
 ### kl_div
@@ -113,5 +113,5 @@ torch kl_div <t1> <t2> [--reduction <Str>] [--log_target]
 ```
 
 ```nu
-nutorch kl_div <t1> <t2> [--reduction <Str>] [--log_target]
+torch kl_div <t1> <t2> [--reduction <Str>] [--log_target]
 ```

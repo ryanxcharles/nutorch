@@ -17,7 +17,7 @@ torch full <shape> <value> [--dtype <Str>] [--requires_grad]
 ```
 
 ```nu
-nutorch full <shape> <value> [--dtype <Str>] [--requires_grad]
+torch full <shape> <value> [--dtype <Str>] [--requires_grad]
 ```
 
 ### randn
@@ -29,7 +29,7 @@ torch randn <shape> [--dtype <Str>] [--requires_grad]
 ```
 
 ```nu
-nutorch randn <shape> [--dtype <Str>] [--requires_grad]
+torch randn <shape> [--dtype <Str>] [--requires_grad]
 ```
 
 ### zeros
@@ -41,7 +41,7 @@ torch zeros <shape> [--dtype <Str>] [--requires_grad]
 ```
 
 ```nu
-nutorch zeros <shape> [--dtype <Str>] [--requires_grad]
+torch zeros <shape> [--dtype <Str>] [--requires_grad]
 ```
 
 ### ones
@@ -53,7 +53,7 @@ torch ones <shape> [--dtype <Str>] [--requires_grad]
 ```
 
 ```nu
-nutorch ones <shape> [--dtype <Str>] [--requires_grad]
+torch ones <shape> [--dtype <Str>] [--requires_grad]
 ```
 
 ### eye
@@ -65,7 +65,7 @@ torch eye <n> [--m <Int>]
 ```
 
 ```nu
-nutorch eye <n> [--m <Int>]
+torch eye <n> [--m <Int>]
 ```
 
 ### arange
@@ -77,7 +77,7 @@ torch arange <end> [--start <Scalar>] [--step <Scalar>]
 ```
 
 ```nu
-nutorch arange <end> [--start <Scalar>] [--step <Scalar>]
+torch arange <end> [--start <Scalar>] [--step <Scalar>]
 ```
 
 ### linspace
@@ -89,7 +89,7 @@ torch linspace <start> <end> <steps>
 ```
 
 ```nu
-nutorch linspace <start> <end> <steps>
+torch linspace <start> <end> <steps>
 ```
 
 ### rand
@@ -101,7 +101,7 @@ torch rand <shape> [--requires_grad]
 ```
 
 ```nu
-nutorch rand <shape> [--requires_grad]
+torch rand <shape> [--requires_grad]
 ```
 
 ### randint
@@ -113,7 +113,7 @@ torch randint <high> <shape> [--low <Int>]
 ```
 
 ```nu
-nutorch randint <high> <shape> [--low <Int>]
+torch randint <high> <shape> [--low <Int>]
 ```
 
 ### zeros_like
@@ -125,7 +125,7 @@ torch zeros_like <t1>
 ```
 
 ```nu
-nutorch zeros_like <t1>
+torch zeros_like <t1>
 ```
 
 ### ones_like
@@ -137,7 +137,7 @@ torch ones_like <t1>
 ```
 
 ```nu
-nutorch ones_like <t1>
+torch ones_like <t1>
 ```
 
 ### full_like
@@ -149,7 +149,7 @@ torch full_like <t1> <value>
 ```
 
 ```nu
-nutorch full_like <t1> <value>
+torch full_like <t1> <value>
 ```
 
 ### rand_like
@@ -161,7 +161,7 @@ torch rand_like <t1>
 ```
 
 ```nu
-nutorch rand_like <t1>
+torch rand_like <t1>
 ```
 
 ### randn_like
@@ -173,5 +173,5 @@ torch randn_like <t1>
 ```
 
 ```nu
-nutorch randn_like <t1>
+torch randn_like <t1>
 ```

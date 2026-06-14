@@ -17,7 +17,7 @@ torch sum <t1> [--dim <Int>] [--keepdim]
 ```
 
 ```nu
-nutorch sum <t1> [--dim <Int>] [--keepdim]
+torch sum <t1> [--dim <Int>] [--keepdim]
 ```
 
 ### mean
@@ -29,7 +29,7 @@ torch mean <t1> [--dim <Int>] [--keepdim]
 ```
 
 ```nu
-nutorch mean <t1> [--dim <Int>] [--keepdim]
+torch mean <t1> [--dim <Int>] [--keepdim]
 ```
 
 ### prod
@@ -41,7 +41,7 @@ torch prod <t1> [--dim <Int>] [--keepdim]
 ```
 
 ```nu
-nutorch prod <t1> [--dim <Int>] [--keepdim]
+torch prod <t1> [--dim <Int>] [--keepdim]
 ```
 
 ### amax
@@ -53,7 +53,7 @@ torch amax <t1> [--dim <Int>] [--keepdim]
 ```
 
 ```nu
-nutorch amax <t1> [--dim <Int>] [--keepdim]
+torch amax <t1> [--dim <Int>] [--keepdim]
 ```
 
 ### amin
@@ -65,7 +65,7 @@ torch amin <t1> [--dim <Int>] [--keepdim]
 ```
 
 ```nu
-nutorch amin <t1> [--dim <Int>] [--keepdim]
+torch amin <t1> [--dim <Int>] [--keepdim]
 ```
 
 ### max
@@ -77,7 +77,7 @@ torch max <t1> [--dim <Int>] [--keepdim]
 ```
 
 ```nu
-nutorch max <t1> [--dim <Int>] [--keepdim]
+torch max <t1> [--dim <Int>] [--keepdim]
 ```
 
 ### min
@@ -89,7 +89,7 @@ torch min <t1> [--dim <Int>] [--keepdim]
 ```
 
 ```nu
-nutorch min <t1> [--dim <Int>] [--keepdim]
+torch min <t1> [--dim <Int>] [--keepdim]
 ```
 
 ### median
@@ -101,7 +101,7 @@ torch median <t1> [--dim <Int>] [--keepdim]
 ```
 
 ```nu
-nutorch median <t1> [--dim <Int>] [--keepdim]
+torch median <t1> [--dim <Int>] [--keepdim]
 ```
 
 ### argmax
@@ -113,7 +113,7 @@ torch argmax <t1> [--dim <Int>] [--keepdim]
 ```
 
 ```nu
-nutorch argmax <t1> [--dim <Int>] [--keepdim]
+torch argmax <t1> [--dim <Int>] [--keepdim]
 ```
 
 ### argmin
@@ -125,7 +125,7 @@ torch argmin <t1> [--dim <Int>] [--keepdim]
 ```
 
 ```nu
-nutorch argmin <t1> [--dim <Int>] [--keepdim]
+torch argmin <t1> [--dim <Int>] [--keepdim]
 ```
 
 ### all
@@ -137,7 +137,7 @@ torch all <t1> [--dim <Int>] [--keepdim]
 ```
 
 ```nu
-nutorch all <t1> [--dim <Int>] [--keepdim]
+torch all <t1> [--dim <Int>] [--keepdim]
 ```
 
 ### any
@@ -149,7 +149,7 @@ torch any <t1> [--dim <Int>] [--keepdim]
 ```
 
 ```nu
-nutorch any <t1> [--dim <Int>] [--keepdim]
+torch any <t1> [--dim <Int>] [--keepdim]
 ```
 
 ### std
@@ -161,7 +161,7 @@ torch std <t1> [--dim <Int>] [--keepdim] [--correction <Int>]
 ```
 
 ```nu
-nutorch std <t1> [--dim <Int>] [--keepdim] [--correction <Int>]
+torch std <t1> [--dim <Int>] [--keepdim] [--correction <Int>]
 ```
 
 ### var
@@ -173,7 +173,7 @@ torch var <t1> [--dim <Int>] [--keepdim] [--correction <Int>]
 ```
 
 ```nu
-nutorch var <t1> [--dim <Int>] [--keepdim] [--correction <Int>]
+torch var <t1> [--dim <Int>] [--keepdim] [--correction <Int>]
 ```
 
 ### nansum
@@ -185,7 +185,7 @@ torch nansum <t1> [--dim <Int>] [--keepdim]
 ```
 
 ```nu
-nutorch nansum <t1> [--dim <Int>] [--keepdim]
+torch nansum <t1> [--dim <Int>] [--keepdim]
 ```
 
 ### logsumexp
@@ -197,7 +197,7 @@ torch logsumexp <t1> [--dim <Int>] [--keepdim]
 ```
 
 ```nu
-nutorch logsumexp <t1> [--dim <Int>] [--keepdim]
+torch logsumexp <t1> [--dim <Int>] [--keepdim]
 ```
 
 ### count_nonzero
@@ -209,7 +209,7 @@ torch count_nonzero <t1> [--dim <Int>]
 ```
 
 ```nu
-nutorch count_nonzero <t1> [--dim <Int>]
+torch count_nonzero <t1> [--dim <Int>]
 ```
 
 ### cumsum
@@ -221,7 +221,7 @@ torch cumsum <t1> [--dim <Int>]
 ```
 
 ```nu
-nutorch cumsum <t1> [--dim <Int>]
+torch cumsum <t1> [--dim <Int>]
 ```
 
 ### cumprod
@@ -233,7 +233,7 @@ torch cumprod <t1> [--dim <Int>]
 ```
 
 ```nu
-nutorch cumprod <t1> [--dim <Int>]
+torch cumprod <t1> [--dim <Int>]
 ```
 
 ### norm
@@ -245,7 +245,7 @@ torch norm <t1> [--p <Float>] [--dim <Int>] [--keepdim]
 ```
 
 ```nu
-nutorch norm <t1> [--p <Float>] [--dim <Int>] [--keepdim]
+torch norm <t1> [--p <Float>] [--dim <Int>] [--keepdim]
 ```
 
 ### diff
@@ -257,5 +257,5 @@ torch diff <t1> [--dim <Int>]
 ```
 
 ```nu
-nutorch diff <t1> [--dim <Int>]
+torch diff <t1> [--dim <Int>]
 ```

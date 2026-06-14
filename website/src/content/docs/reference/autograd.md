@@ -17,7 +17,7 @@ torch backward <t1>
 ```
 
 ```nu
-nutorch backward <t1>
+torch backward <t1>
 ```
 
 ### grad
@@ -29,7 +29,7 @@ torch grad <t1>
 ```
 
 ```nu
-nutorch grad <t1>
+torch grad <t1>
 ```
 
 ### detach
@@ -41,7 +41,7 @@ torch detach <t1>
 ```
 
 ```nu
-nutorch detach <t1>
+torch detach <t1>
 ```
 
 ### zero_grad
@@ -53,5 +53,5 @@ torch zero_grad <t1>
 ```
 
 ```nu
-nutorch zero_grad <t1>
+torch zero_grad <t1>
 ```

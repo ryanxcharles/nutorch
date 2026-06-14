@@ -17,7 +17,7 @@ torch cat <t1>... (at least 2) [--dim <Int>]
 ```
 
 ```nu
-nutorch cat <t1>... (at least 2) [--dim <Int>]
+torch cat <t1>... (at least 2) [--dim <Int>]
 ```
 
 ### reshape
@@ -29,7 +29,7 @@ torch reshape <t1> <shape>
 ```
 
 ```nu
-nutorch reshape <t1> <shape>
+torch reshape <t1> <shape>
 ```
 
 ### permute
@@ -41,7 +41,7 @@ torch permute <t1> <dims>
 ```
 
 ```nu
-nutorch permute <t1> <dims>
+torch permute <t1> <dims>
 ```
 
 ### transpose
@@ -53,7 +53,7 @@ torch transpose <t1> <dim0> <dim1>
 ```
 
 ```nu
-nutorch transpose <t1> <dim0> <dim1>
+torch transpose <t1> <dim0> <dim1>
 ```
 
 ### t
@@ -65,7 +65,7 @@ torch t <t1>
 ```
 
 ```nu
-nutorch t <t1>
+torch t <t1>
 ```
 
 ### squeeze
@@ -77,7 +77,7 @@ torch squeeze <t1> [--dim <Int>]
 ```
 
 ```nu
-nutorch squeeze <t1> [--dim <Int>]
+torch squeeze <t1> [--dim <Int>]
 ```
 
 ### unsqueeze
@@ -89,7 +89,7 @@ torch unsqueeze <t1> <dim>
 ```
 
 ```nu
-nutorch unsqueeze <t1> <dim>
+torch unsqueeze <t1> <dim>
 ```
 
 ### flatten
@@ -101,7 +101,7 @@ torch flatten <t1> [--start_dim <Int>] [--end_dim <Int>]
 ```
 
 ```nu
-nutorch flatten <t1> [--start_dim <Int>] [--end_dim <Int>]
+torch flatten <t1> [--start_dim <Int>] [--end_dim <Int>]
 ```
 
 ### stack
@@ -113,7 +113,7 @@ torch stack <t1>... (at least 2) [--dim <Int>]
 ```
 
 ```nu
-nutorch stack <t1>... (at least 2) [--dim <Int>]
+torch stack <t1>... (at least 2) [--dim <Int>]
 ```
 
 ### split
@@ -125,7 +125,7 @@ torch split <t1> <split_size> [--dim <Int>]
 ```
 
 ```nu
-nutorch split <t1> <split_size> [--dim <Int>]
+torch split <t1> <split_size> [--dim <Int>]
 ```
 
 ### chunk
@@ -137,7 +137,7 @@ torch chunk <t1> <chunks> [--dim <Int>]
 ```
 
 ```nu
-nutorch chunk <t1> <chunks> [--dim <Int>]
+torch chunk <t1> <chunks> [--dim <Int>]
 ```
 
 ### gather
@@ -149,7 +149,7 @@ torch gather <t1> <t2> [--dim <Int>]
 ```
 
 ```nu
-nutorch gather <t1> <t2> [--dim <Int>]
+torch gather <t1> <t2> [--dim <Int>]
 ```
 
 ### index_select
@@ -161,7 +161,7 @@ torch index_select <t1> <t2> [--dim <Int>]
 ```
 
 ```nu
-nutorch index_select <t1> <t2> [--dim <Int>]
+torch index_select <t1> <t2> [--dim <Int>]
 ```
 
 ### masked_select
@@ -173,7 +173,7 @@ torch masked_select <t1> <t2>
 ```
 
 ```nu
-nutorch masked_select <t1> <t2>
+torch masked_select <t1> <t2>
 ```
 
 ### where
@@ -185,7 +185,7 @@ torch where <t1> <t2> <t3>
 ```
 
 ```nu
-nutorch where <t1> <t2> <t3>
+torch where <t1> <t2> <t3>
 ```
 
 ### narrow
@@ -197,7 +197,7 @@ torch narrow <t1> <dim> <start> <length>
 ```
 
 ```nu
-nutorch narrow <t1> <dim> <start> <length>
+torch narrow <t1> <dim> <start> <length>
 ```
 
 ### flip
@@ -209,7 +209,7 @@ torch flip <t1> <dims>
 ```
 
 ```nu
-nutorch flip <t1> <dims>
+torch flip <t1> <dims>
 ```
 
 ### roll
@@ -221,7 +221,7 @@ torch roll <t1> <shifts> [--dims <IntList>]
 ```
 
 ```nu
-nutorch roll <t1> <shifts> [--dims <IntList>]
+torch roll <t1> <shifts> [--dims <IntList>]
 ```
 
 ### repeat
@@ -233,7 +233,7 @@ torch repeat <t1> <repeats>
 ```
 
 ```nu
-nutorch repeat <t1> <repeats>
+torch repeat <t1> <repeats>
 ```
 
 ### repeat_interleave
@@ -245,7 +245,7 @@ torch repeat_interleave <t1> <repeats> [--dim <Int>]
 ```
 
 ```nu
-nutorch repeat_interleave <t1> <repeats> [--dim <Int>]
+torch repeat_interleave <t1> <repeats> [--dim <Int>]
 ```
 
 ### movedim
@@ -257,7 +257,7 @@ torch movedim <t1> <source> <destination>
 ```
 
 ```nu
-nutorch movedim <t1> <source> <destination>
+torch movedim <t1> <source> <destination>
 ```
 
 ### take_along_dim
@@ -269,7 +269,7 @@ torch take_along_dim <t1> <t2> [--dim <Int>]
 ```
 
 ```nu
-nutorch take_along_dim <t1> <t2> [--dim <Int>]
+torch take_along_dim <t1> <t2> [--dim <Int>]
 ```
 
 ### scatter
@@ -281,5 +281,5 @@ torch scatter <t1> <t2> <t3> [--dim <Int>]
 ```
 
 ```nu
-nutorch scatter <t1> <t2> <t3> [--dim <Int>]
+torch scatter <t1> <t2> <t3> [--dim <Int>]
 ```

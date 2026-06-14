@@ -21,12 +21,12 @@ torch nn info $m --json                          # the same, as JSON
 ```
 
 ```nu
-let l = (nutorch nn linear 2 3)                  # PyTorch-default init, seeded
-let m = (nutorch nn sequential $l (nutorch nn relu))  # consumes the child handles
-let y = (nutorch forward $m $x)                  # or: $x | nutorch forward $m
-nutorch nn parameters $m                         # tensor:// handles — LIVE views
-nutorch nn info $m                               # architecture, param counts
-nutorch nn info $m --json                        # the same, as a native record
+let l = (torch nn linear 2 3)                  # PyTorch-default init, seeded
+let m = (torch nn sequential $l (torch nn relu))  # consumes the child handles
+let y = (torch forward $m $x)                  # or: $x | torch forward $m
+torch nn parameters $m                         # tensor:// handles — LIVE views
+torch nn info $m                               # architecture, param counts
+torch nn info $m --json                        # the same, as a native record
 ```
 
 Module kinds (19): `linear`, `conv1d`, `conv2d`, `conv_transpose2d`,
@@ -67,21 +67,21 @@ torch value $loss     # 6.0012 → 2.46e-7 on the reference run
 ```
 
 ```nu
-nutorch manual_seed 42
-let x = (nutorch tensor [[0.0] [1.0] [2.0] [3.0]])
-let y = (nutorch tensor [[1.0] [3.0] [5.0] [7.0]])
-let model = (nutorch nn linear 1 1)
-let opt = (nutorch nn sgd $model --lr 0.05)
+torch manual_seed 42
+let x = (torch tensor [[0.0] [1.0] [2.0] [3.0]])
+let y = (torch tensor [[1.0] [3.0] [5.0] [7.0]])
+let model = (torch nn linear 1 1)
+let opt = (torch nn sgd $model --lr 0.05)
 
 mut loss = ""   # nu: a binding that outlives a loop is mut
 for i in 1..200 {
-  let pred = (nutorch forward $model $x)
-  $loss = (nutorch mse_loss $pred $y)
-  nutorch backward $loss
-  nutorch step $opt
-  nutorch nn zero_grad $opt
+  let pred = (torch forward $model $x)
+  $loss = (torch mse_loss $pred $y)
+  torch backward $loss
+  torch step $opt
+  torch nn zero_grad $opt
 }
-print (nutorch value $loss)   # 6.0012 → 2.46e-7 on the reference run
+print (torch value $loss)   # 6.0012 → 2.46e-7 on the reference run
 ```
 
 Optimizers: `sgd`, `adam`, `adamw`, `rmsprop` — with the PyTorch defaults and
@@ -96,8 +96,8 @@ torch nn load $fresh model.safetensors    # into a same-architecture module
 ```
 
 ```nu
-nutorch nn save $m model.safetensors      # state_dict, buffers included
-nutorch nn load $fresh model.safetensors  # into a same-architecture module
+torch nn save $m model.safetensors      # state_dict, buffers included
+torch nn load $fresh model.safetensors  # into a same-architecture module
 ```
 
 The format is safetensors with PyTorch's state-dict naming (including
