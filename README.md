@@ -183,14 +183,6 @@ The installed binaries are relocatable: libtorch's required dylibs are copied
 into the prefix and resolved by a baked relative rpath — no environment
 variables, no checkout needed at runtime.
 
-## Status
-
-**Proof of concept working** (issue 0002): daemon, thin client, six ops
-(`tensor`, `full`, `add`, `mm`, `mean`, `value`), exact GPU results from plain
-bash. The architecture is being worked out in the open — see the issue tracker
-at [issues/README.md](issues/README.md) and the agent contract / vision in
-[AGENTS.md](AGENTS.md).
-
 ## Copyright
 
 Copyright (c) 2026 [Astrohacker](https://astrohacker.com) — MIT License (see
