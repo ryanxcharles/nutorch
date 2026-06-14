@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "astro dev",
     "build": "rm -rf node_modules/.astro .astro && astro build && pagefind --site dist",
+    "deploy": "bun run build && wrangler pages deploy dist",
     "preview": "astro preview",
     "build:images": "bun run scripts/process-images.ts",
     "check:content": "bun run scripts/check-content.ts",
