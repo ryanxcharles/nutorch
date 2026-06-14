@@ -7,7 +7,7 @@ class Nutorch < Formula
   desc "GPU tensor daemon and CLI for any shell (Apple-silicon MPS, PyTorch-powered)"
   homepage "https://github.com/nutorch/nutorch"
   url "https://github.com/nutorch/nutorch/releases/download/v1.0.1/nutorch-1.0.1.tar.gz"
-  sha256 "3619bc009757ba89ac79f142ba14583281959d494aa366cc08a094905855483f"
+  sha256 "e9bb572dbf70418abc3987f65ffad936d16c7ae9fbfb7075f0912c9fac117d7c"
   license "MIT"
 
   depends_on "rust" => :build
