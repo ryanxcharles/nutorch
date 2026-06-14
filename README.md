@@ -2,11 +2,11 @@
 
 **GPU-accelerated PyTorch tensor operations from any shell.**
 
-Nutorch v2 is **nutorchd**: a standalone daemon that owns a tensor database
-(backed by [tch-rs](https://github.com/LaurentMazare/tch-rs) / LibTorch, the C++
-engine behind [PyTorch](https://pytorch.org/)) and serves thin CLI clients over
-a Unix socket. Tensors are referenced by string identifiers, so handles flow
-through ordinary pipelines — in bash, zsh, fish, or any other shell.
+Nutorch is **nutorchd**: a standalone daemon that owns a tensor database (backed
+by [tch-rs](https://github.com/LaurentMazare/tch-rs) / LibTorch, the C++ engine
+behind [PyTorch](https://pytorch.org/)) and serves thin CLI clients over a Unix
+socket. Tensors are referenced by string identifiers, so handles flow through
+ordinary pipelines — in bash, zsh, fish, or any other shell.
 [Nushell](https://www.nushell.sh/) remains the premium client, with structured
 data and native serialization.
 
