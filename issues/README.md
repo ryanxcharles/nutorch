@@ -2,8 +2,9 @@
 
 ## Open
 
-| # | Title | Opened |
-| - | ----- | ------ |
+| #                               | Title                                      | Opened     |
+| ------------------------------- | ------------------------------------------ | ---------- |
+| [0018](0018-shape-op/README.md) | `shape` — a tensor's dimensions, on demand | 2026-06-14 |
 
 ## Closed
 
