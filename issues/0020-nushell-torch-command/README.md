@@ -86,3 +86,8 @@ Out:
 - Changing POSIX-shell command behavior.
 - Removing `nutorch` compatibility without a specific experiment and migration
   decision.
+
+## Experiments
+
+- [Experiment 1: Rename the Nushell namespace](01-rename-nushell-namespace.md) —
+  **Designed**
