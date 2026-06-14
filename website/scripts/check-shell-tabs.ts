@@ -3,18 +3,73 @@
 // multi-group flip, cross-page persistence, hero on the shared key, and
 // legacy-key migration.
 // Requires the preview server: `bun run preview --port 4399`.
-import { mkdtempSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { delimiter } from "node:path";
 
 declare const Bun: any;
 
-const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const MAC_BROWSERS = [
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  "/Applications/Chromium.app/Contents/MacOS/Chromium",
+  "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+  "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
+];
+const PATH_BROWSERS = [
+  "google-chrome",
+  "chromium",
+  "chromium-browser",
+  "msedge",
+  "brave-browser",
+];
 const PORT = 9226;
 const DOCS = "http://localhost:4399/docs/getting-started/";
 const HOME = "http://localhost:4399/";
 
+function pathBinary(name: string): string | null {
+  for (const dir of (process.env.PATH ?? "").split(delimiter)) {
+    if (!dir) continue;
+    const candidate = `${dir}/${name}`;
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
+function playwrightBrowsers(): string[] {
+  const root = `${process.env.HOME}/Library/Caches/ms-playwright`;
+  let dirs: string[] = [];
+  try {
+    dirs = readdirSync(root);
+  } catch {
+    return [];
+  }
+  return dirs
+    .filter((dir) => dir.startsWith("chromium-"))
+    .sort()
+    .reverse()
+    .flatMap((dir) => [
+      `${root}/${dir}/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing`,
+      `${root}/${dir}/chrome-mac/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing`,
+    ]);
+}
+
+function browserPath(): string {
+  const candidates = [
+    process.env.CHROME,
+    ...MAC_BROWSERS,
+    ...playwrightBrowsers(),
+    ...PATH_BROWSERS.map(pathBinary),
+  ].filter((p): p is string => Boolean(p));
+  const found = candidates.find((p) => existsSync(p));
+  if (found) return found;
+  throw new Error(
+    "check:tabs needs Chrome/Chromium. Set CHROME or install one of: "
+      + [...MAC_BROWSERS, "~/Library/Caches/ms-playwright/chromium-*", ...PATH_BROWSERS].join(", "),
+  );
+}
+
 const proc = Bun.spawn(
-  [CHROME, "--headless", "--disable-gpu",
+  [browserPath(), "--headless", "--disable-gpu",
     `--remote-debugging-port=${PORT}`,
     `--user-data-dir=${mkdtempSync(`${tmpdir()}/nutorch-shelltabs-`)}`,
     "about:blank"],

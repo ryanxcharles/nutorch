@@ -46,7 +46,7 @@ testing shell tabs.
 
 1. **`nutorchd/src/nn.rs`**:
    - Replace `NnModule::Linear` forward's `f_linear` call with explicit fallible
-     `f_matmul(weight.f_t())` plus optional fallible bias addition.
+     `f_matmul(weight.f_transpose(0, 1))` plus optional fallible bias addition.
    - Preserve the current error context (`linear forward: ...`) and autograd
      behavior.
 2. **`website/scripts/check-shell-tabs.ts`**:
@@ -110,3 +110,74 @@ folded: Experiment 1's README status remains `Partial` as its historical result;
 Experiment 2 becomes `Pass` if this experiment clears the remaining gates. One
 Nit was folded: the NN forward rewrite now explicitly names fallible tch calls
 and preserving `linear forward: ...` error context.
+
+## Result
+
+**Result:** Pass
+
+The biased linear forward path now computes
+`input.matmul(weight.transpose(0, 1))` and adds the stored bias explicitly. That
+cleared the four biased linear golden failures without changing the no-bias
+case, and the regression training scripts now converge again through both the
+POSIX shell and Nushell surfaces.
+
+The shell-tabs verifier now discovers a browser through `CHROME`, common macOS
+Chrome-family app locations, cached Playwright Chromium installs, or PATH
+Chrome-family binaries. It still fails if no browser is available; the change
+only removes the single hard-coded `/Applications/Google Chrome.app` assumption.
+
+Verification run:
+
+- `cargo fmt`
+- `cargo check`
+- `cargo fmt -- --check`
+- `cargo test`
+- `cargo build`
+- `PATH="$PWD/target/debug:$PATH" scripts/train-regression.sh`
+- `PATH="$PWD/target/debug:$PATH" nu scripts/train-regression.nu`
+- `PATH="$PWD/target/debug:$PATH" cargo test -p torch-cli`
+- `PATH="$PWD/target/debug:$PATH" nu scripts/test-dual-input.nu`
+- `PATH="/Users/astrohacker/dev/nutorch/target/debug:$PATH" bun run build` from
+  `website/`
+- `bun run preview -- --host 127.0.0.1 --port 4399` from `website/`, while
+  `bun run check:tabs` ran
+- `PATH="/Users/astrohacker/dev/nutorch/target/debug:$PATH" bun run check:ops-ref`
+  from `website/`
+- `PATH="/Users/astrohacker/dev/nutorch/target/debug:$PATH" bun run check:content`
+  from `website/`
+- `bun run check:mirror` from `website/`
+- `dprint check`
+- `git diff --check`
+- `rg -n '\bnutorch [a-z][a-z0-9_-]*' README.md website/src/content scripts`
+  returned only the deliberate compatibility assertion in
+  `scripts/test-dual-input.nu`
+
+The full `cargo test` suite passes. The website build and documentation
+verifiers pass, including `check:tabs` against the cached Playwright Chromium
+binary in this environment. Experiment 1 remains recorded as `Partial` because
+that was its historical result; this experiment clears the blockers it found.
+
+## Conclusion
+
+Issue 20's requested command-name change is verified end to end. Nushell now
+uses `torch` as the primary structured command namespace, `nutorch` remains as a
+compatibility path, and the remaining verification blockers from Experiment 1
+are cleared.
+
+## Completion Review
+
+**Reviewer:** Codex fresh-context subagent (`multi_agent_v1`, nickname `Dewey`).
+**Verdict: APPROVED — no findings.**
+
+The reviewer confirmed that the diff is scoped to the documented blockers,
+Experiment 1 remains historical `Partial`, Experiment 2 is correctly marked
+`Pass`, issue 20 is closed consistently, and `issues/README.md` reflects that
+closure. The reviewer independently verified `cargo fmt -- --check`,
+`dprint check`, `git diff --check`, `cargo check`, `cargo test`,
+`cargo test -p torch-cli`, both regression training scripts, the Nushell
+dual-input script and live `torch` / `^torch` / `nutorch` smokes, website
+`check:ops-ref`, `check:content`, `check:mirror`, `check:tabs`, and the
+command-name audit.
+
+The reviewer did not rerun `bun run build` because it deletes and rewrites build
+directories, which would violate the read-only review constraint.

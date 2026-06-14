@@ -1,6 +1,7 @@
 +++
-status = "open"
+status = "closed"
 opened = "2026-06-14"
+closed = "2026-06-14"
 +++
 
 # Issue 20: Nushell uses `torch`
@@ -93,4 +94,19 @@ Out:
   **Partial** (rename works; full verification blocked by unchanged NN golden
   failures and missing Chrome for `check:tabs`)
 - [Experiment 2: Clear the remaining verification blockers](02-clear-verification-blockers.md)
-  — **Designed**
+  — **Pass**
+
+## Conclusion
+
+Nushell now uses `torch` as the primary structured command namespace, matching
+the external CLI name used by other shells. The generated module still exports
+`nutorch` compatibility commands for existing Nushell scripts, and the
+documentation now teaches `torch` first while reserving `^torch` for explicitly
+calling the external binary from Nushell.
+
+Experiment 1 made the command rename and documentation update but ended Partial
+because unrelated verification blockers prevented closing the issue. Experiment
+2 cleared those blockers: biased linear forward now includes the stored bias,
+and the shell-tabs verifier discovers an available Chrome-family browser instead
+of requiring one fixed macOS path. With the Rust, training, command-name,
+website, and documentation gates passing, issue 20 is closed.

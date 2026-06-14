@@ -149,9 +149,20 @@ impl NnModule {
 
     pub fn forward(&self, input: &Tensor) -> Result<Tensor, String> {
         match self {
-            NnModule::Linear { weight, bias } => input
-                .f_linear(weight, bias.as_ref())
-                .map_err(|e| format!("linear forward: {}", tch_error(e))),
+            NnModule::Linear { weight, bias } => {
+                let weight_t = weight
+                    .f_transpose(0, 1)
+                    .map_err(|e| format!("linear forward: {}", tch_error(e)))?;
+                let output = input
+                    .f_matmul(&weight_t)
+                    .map_err(|e| format!("linear forward: {}", tch_error(e)))?;
+                match bias {
+                    Some(bias) => output
+                        .f_add(bias)
+                        .map_err(|e| format!("linear forward: {}", tch_error(e))),
+                    None => Ok(output),
+                }
+            }
             NnModule::Relu => input.f_relu().map_err(tch_error),
             NnModule::Sigmoid => input.f_sigmoid().map_err(tch_error),
             NnModule::Tanh => input.f_tanh().map_err(tch_error),

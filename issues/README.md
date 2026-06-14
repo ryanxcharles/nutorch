@@ -2,14 +2,14 @@
 
 ## Open
 
-| #                                            | Title                | Opened     |
-| -------------------------------------------- | -------------------- | ---------- |
-| [0020](0020-nushell-torch-command/README.md) | Nushell uses `torch` | 2026-06-14 |
+| # | Title | Opened |
+| - | ----- | ------ |
 
 ## Closed
 
 | #                                                     | Title                                                                              | Opened     | Closed     |
 | ----------------------------------------------------- | ---------------------------------------------------------------------------------- | ---------- | ---------- |
+| [0020](0020-nushell-torch-command/README.md)          | Nushell uses `torch`                                                               | 2026-06-14 | 2026-06-14 |
 | [0019](0019-shape-on-the-website/README.md)           | `shape` joins the website docs                                                     | 2026-06-14 | 2026-06-14 |
 | [0018](0018-shape-op/README.md)                       | `shape` — a tensor's dimensions, on demand                                         | 2026-06-14 | 2026-06-14 |
 | [0017](0017-mirrored-examples/README.md)              | Mirrored examples, everywhere — including the reference                            | 2026-06-12 | 2026-06-12 |
